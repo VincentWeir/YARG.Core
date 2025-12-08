@@ -7,6 +7,8 @@ namespace YARG.Core.Engine.Guitar.Engines
 {
     public class YargFiveFretEngine : GuitarEngine
     {
+        public static bool isProAnchoring = false;
+
         public YargFiveFretEngine(InstrumentDifficulty<GuitarNote> chart, SyncTrack syncTrack,
             GuitarEngineParameters engineParameters, bool isBot)
             : base(chart, syncTrack, engineParameters, isBot)
@@ -291,134 +293,173 @@ namespace YARG.Core.Engine.Guitar.Engines
 
         protected override bool CanNoteBeHit(GuitarNote note)
         {
-            ushort buttonsMasked = EffectiveButtonMask;
-            if (ActiveSustains.Count > 0)
+            if (isProAnchoring == true)
             {
+                ushort buttonsMasked = EffectiveButtonMask;
+                if (ActiveSustains.Count > 0)
+                {
+                    foreach (var sustain in ActiveSustains)
+                    {
+                        var sustainNote = sustain.Note;
+
+                        if (sustainNote.IsExtendedSustain)
+                        {
+                            // Remove the note mask if its an extended sustain
+                            // Difference between NoteMask and DisjointMask is that DisjointMask is only a single fret
+                            // while NoteMask is the entire chord
+
+                            // TODO Notes cannot be hit if a sustain of the same fret is being held e.g H-ELL Solo 3C5
+
+                            //byte sameFretsHeld = (byte) ((byte) (sustain.Note.NoteMask & note.NoteMask) & ButtonMask);
+
+                            var maskToRemove = sustainNote.IsDisjoint ? sustainNote.DisjointMask : sustainNote.NoteMask;
+                            buttonsMasked &= unchecked((byte) ~maskToRemove);
+                            //buttonsMasked |= sameFretsHeld;
+                        }
+                    }
+
+                    // If the resulting masked buttons are 0, we need to apply the Open Mask so open notes can be hit
+                    // Need to make a copy of the button mask to prevent modifying the original
+                    ushort buttonMaskCopy = EffectiveButtonMask;
+                    if (buttonsMasked == 0)
+                    {
+                        buttonsMasked |= OPEN_MASK;
+                        buttonMaskCopy |= OPEN_MASK;
+                    }
+
+                    // We dont want to use masked buttons for hit logic if the buttons are identical
+                    if (buttonsMasked != buttonMaskCopy && IsNoteHittable(note, buttonsMasked))
+                    {
+                        return true;
+                    }
+                }
+
+                // If masked/extended sustain logic didn't work, try original ButtonMask
+                return IsNoteHittable(note, EffectiveButtonMask);
+
+                static bool IsNoteHittable(GuitarNote note, ushort buttonsMasked)
+                {
+                    // Only used for sustain logic
+                    bool useDisjointSustainMask = note is { IsDisjoint: true, WasHit: true };
+
+                    // Use the DisjointMask for comparison if disjointed and was hit (for sustain logic)
+                    int noteMask = useDisjointSustainMask ? note.DisjointMask : note.NoteMask;
+
+                    // If disjointed and is sustain logic (was hit), can hit if disjoint mask matches
+                    if (useDisjointSustainMask && (note.DisjointMask & buttonsMasked) != 0)
+                    {
+                        if ((note.DisjointMask & buttonsMasked) != 0)
+                        {
+                            return true;
+                        }
+
+                        if ((note.NoteMask & OPEN_MASK) != 0)
+                        {
+                            return true;
+                        }
+                    }
+
+                    // Open chords
+                    // Contains open fret but the note mask is not strictly the open mask
+                    if ((noteMask & OPEN_MASK) != 0 && noteMask != OPEN_MASK)
+                    {
+                        // Open chords are basically normal chords except no anchoring in any circumstances
+                        // Prevents HOPO/Tap chords from being anchored
+
+                        var buttonsMaskedWithOpen = buttonsMasked | OPEN_MASK;
+
+                        if (buttonsMaskedWithOpen == noteMask)
+                        {
+                            return true;
+                        }
+                    }
+
+                    // If holding exact note mask, can hit
+                    if (buttonsMasked == noteMask)
+                    {
+                        return true;
+                    }
+
+                    // Anchoring
+
+                    // XORing the two masks will give the anchor (held frets) around the note.
+                    int anchorButtons = buttonsMasked ^ noteMask;
+
+                    // Chord logic
+                    if (note.IsChord)
+                    {
+                        if (note.IsStrum)
+                        {
+                            // Buttons must match note mask exactly for strum chords
+                            return buttonsMasked == noteMask;
+                        }
+
+                        // Anchoring hopo/tap chords
+
+                        // Gets the lowest fret of the chord.
+                        var chordMask = 0;
+                        for (var fret = GuitarAction.GreenFret; fret <= GuitarAction.OrangeFret; fret++)
+                        {
+                            chordMask = 1 << (int) fret;
+
+                            // If the current fret mask is part of the chord, break
+                            if ((chordMask & note.NoteMask) == chordMask)
+                            {
+                                break;
+                            }
+                        }
+
+                        // Anchor part:
+                        // Lowest fret of chord must be bigger or equal to anchor buttons
+                        // (can't hold note higher than the highest fret of chord)
+
+                        // Button mask subtract the anchor must equal chord mask (all frets of chord held)
+                        return chordMask >= anchorButtons && buttonsMasked - anchorButtons == note.NoteMask;
+                    }
+
+                    // Anchoring single notes
+                    // Anchors are buttons held lower than the note mask
+
+                    // Remove the open mask from note otherwise this will always pass (as its higher than all notes)
+                    // This is only used for single notes, open chords are handled above
+                    return anchorButtons < (noteMask & unchecked((byte) ~OPEN_MASK));
+                }
+            }
+            else
+            {
+                byte buttonsMasked = EffectiveButtonMask;
                 foreach (var sustain in ActiveSustains)
                 {
                     var sustainNote = sustain.Note;
 
                     if (sustainNote.IsExtendedSustain)
                     {
-                        // Remove the note mask if its an extended sustain
-                        // Difference between NoteMask and DisjointMask is that DisjointMask is only a single fret
-                        // while NoteMask is the entire chord
-
-                        // TODO Notes cannot be hit if a sustain of the same fret is being held e.g H-ELL Solo 3C5
-
-                        //byte sameFretsHeld = (byte) ((byte) (sustain.Note.NoteMask & note.NoteMask) & ButtonMask);
-
                         var maskToRemove = sustainNote.IsDisjoint ? sustainNote.DisjointMask : sustainNote.NoteMask;
-                        buttonsMasked &= unchecked((byte) ~maskToRemove);
-                        //buttonsMasked |= sameFretsHeld;
+                        buttonsMasked -= (byte) maskToRemove;
                     }
                 }
 
-                // If the resulting masked buttons are 0, we need to apply the Open Mask so open notes can be hit
-                // Need to make a copy of the button mask to prevent modifying the original
-                ushort buttonMaskCopy = EffectiveButtonMask;
-                if (buttonsMasked == 0)
+                return IsNoteHittable(note, buttonsMasked);
+
+                static bool IsNoteHittable(GuitarNote note, byte buttonsMasked)
                 {
-                    buttonsMasked |= OPEN_MASK;
-                    buttonMaskCopy |= OPEN_MASK;
-                }
+                    int noteMask = note.NoteMask;
 
-                // We dont want to use masked buttons for hit logic if the buttons are identical
-                if (buttonsMasked != buttonMaskCopy && IsNoteHittable(note, buttonsMasked))
-                {
-                    return true;
-                }
-            }
+                    // OPEN NOTE LOGIC
+                    if (noteMask == 0) 
+                        return buttonsMasked == 0;
 
-            // If masked/extended sustain logic didn't work, try original ButtonMask
-            return IsNoteHittable(note, EffectiveButtonMask);
+                    // Must be holding *something* for non-open notes
+                    if (buttonsMasked == 0)
+                        return false;
 
-            static bool IsNoteHittable(GuitarNote note, ushort buttonsMasked)
-            {
-                // Only used for sustain logic
-                bool useDisjointSustainMask = note is { IsDisjoint: true, WasHit: true };
-
-                // Use the DisjointMask for comparison if disjointed and was hit (for sustain logic)
-                int noteMask = useDisjointSustainMask ? note.DisjointMask : note.NoteMask;
-
-                // If disjointed and is sustain logic (was hit), can hit if disjoint mask matches
-                if (useDisjointSustainMask && (note.DisjointMask & buttonsMasked) != 0)
-                {
-                    if ((note.DisjointMask & buttonsMasked) != 0)
-                    {
-                        return true;
-                    }
-
-                    if ((note.NoteMask & OPEN_MASK) != 0)
-                    {
-                        return true;
-                    }
-                }
-
-                // Open chords
-                // Contains open fret but the note mask is not strictly the open mask
-                if ((noteMask & OPEN_MASK) != 0 && noteMask != OPEN_MASK)
-                {
-                    // Open chords are basically normal chords except no anchoring in any circumstances
-                    // Prevents HOPO/Tap chords from being anchored
-
-                    var buttonsMaskedWithOpen = buttonsMasked | OPEN_MASK;
-
-                    if (buttonsMaskedWithOpen == noteMask)
-                    {
-                        return true;
-                    }
-                }
-
-                // If holding exact note mask, can hit
-                if (buttonsMasked == noteMask)
-                {
-                    return true;
-                }
-
-                // Anchoring
-
-                // XORing the two masks will give the anchor (held frets) around the note.
-                int anchorButtons = buttonsMasked ^ noteMask;
-
-                // Chord logic
-                if (note.IsChord)
-                {
-                    if (note.IsStrum)
-                    {
-                        // Buttons must match note mask exactly for strum chords
+                    // If this is a CHORD → require exact match
+                    if (note.IsChord)
                         return buttonsMasked == noteMask;
-                    }
 
-                    // Anchoring hopo/tap chords
-
-                    // Gets the lowest fret of the chord.
-                    var chordMask = 0;
-                    for (var fret = GuitarAction.GreenFret; fret <= GuitarAction.OrangeFret; fret++)
-                    {
-                        chordMask = 1 << (int) fret;
-
-                        // If the current fret mask is part of the chord, break
-                        if ((chordMask & note.NoteMask) == chordMask)
-                        {
-                            break;
-                        }
-                    }
-
-                    // Anchor part:
-                    // Lowest fret of chord must be bigger or equal to anchor buttons
-                    // (can't hold note higher than the highest fret of chord)
-
-                    // Button mask subtract the anchor must equal chord mask (all frets of chord held)
-                    return chordMask >= anchorButtons && buttonsMasked - anchorButtons == note.NoteMask;
+                    // Single notes only require overlap
+                    return (buttonsMasked & noteMask) != 0;
                 }
-
-                // Anchoring single notes
-                // Anchors are buttons held lower than the note mask
-
-                // Remove the open mask from note otherwise this will always pass (as its higher than all notes)
-                // This is only used for single notes, open chords are handled above
-                return anchorButtons < (noteMask & unchecked((byte) ~OPEN_MASK));
             }
         }
 
