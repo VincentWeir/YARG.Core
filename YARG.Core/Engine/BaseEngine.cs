@@ -33,7 +33,7 @@ namespace YARG.Core.Engine
         public ComboIncrementEvent?  OnComboIncrement;
         public UnisonBonusAwardedEvent? OnUnisonBonusAwarded;
 
-        public bool CanStarPowerActivate => BaseStats.StarPowerTickAmount >= TicksPerHalfSpBar;
+        public bool CanStarPowerActivate => BaseStats.StarPowerTickAmount >= TicksPerQuarterSpBar;
 
         public int BaseScore { get; protected set; }
 
