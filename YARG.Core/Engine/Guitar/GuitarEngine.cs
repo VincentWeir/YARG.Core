@@ -206,7 +206,10 @@ namespace YARG.Core.Engine.Guitar
 
             if (note.IsStarPower && note.IsStarPowerEnd)
             {
-                AwardStarPower(note);
+                AwardStarPower(note);               // ← restore the sound trigger  
+                BaseStats.StarPowerTickAmount = 0;  // ← wipe out what AwardStarPower gave
+
+                GainStarPower(TicksPerQuarterSpBar);
                 EngineStats.StarPowerPhrasesHit++;
             }
 
