@@ -206,10 +206,21 @@ namespace YARG.Core.Engine.Guitar
 
             if (note.IsStarPower && note.IsStarPowerEnd)
             {
-                AwardStarPower(note);               // ← restore the sound trigger  
-                BaseStats.StarPowerTickAmount = 0;  // ← wipe out what AwardStarPower gave
+                // Save SP amount before AwardStarPower() runs
+                uint before = BaseStats.StarPowerTickAmount;
 
+                // Play audio + visual effects + stats logic
+                AwardStarPower(note);
+
+                // Calculate how many ticks AwardStarPower added
+                uint gained = BaseStats.StarPowerTickAmount - before;
+
+                // Remove ONLY the unwanted default gain
+                BaseStats.StarPowerTickAmount -= gained;
+
+                // Add your fixed 1/4 SP bar
                 GainStarPower(TicksPerQuarterSpBar);
+
                 EngineStats.StarPowerPhrasesHit++;
             }
 
