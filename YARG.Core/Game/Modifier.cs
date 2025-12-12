@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using YARG.Core.Engine.Guitar.Engines;
 
 namespace YARG.Core.Game
 {
@@ -38,33 +39,43 @@ namespace YARG.Core.Game
 
         public static Modifier PossibleModifiers(this GameMode gameMode)
         {
-            return gameMode switch
+            if (YargFiveFretEngine.isProAnchoring == true)
             {
-                GameMode.FiveFretGuitar =>
-                    Modifier.AllStrums     |
-                    Modifier.AllHopos      |
-                    Modifier.AllTaps       |
-                    Modifier.HoposToTaps   |
-                    Modifier.TapsToHopos   |
-                    Modifier.RangeCompress,
+                return gameMode switch
+                {
+                    GameMode.FiveFretGuitar =>
+                        Modifier.AllStrums     |
+                        Modifier.AllHopos      |
+                        Modifier.RangeCompress,
 
-                GameMode.FourLaneDrums or
-                GameMode.FiveLaneDrums =>
-                    Modifier.NoKicks    |
-                    Modifier.NoDynamics,
+                    GameMode.FourLaneDrums or
+                    GameMode.FiveLaneDrums =>
+                        Modifier.NoKicks    |
+                        Modifier.NoDynamics,
 
-                GameMode.Vocals =>
-                    Modifier.UnpitchedOnly |
-                    Modifier.NoVocalPercussion,
+                    GameMode.Vocals =>
+                        Modifier.UnpitchedOnly |
+                        Modifier.NoVocalPercussion,
 
-                GameMode.SixFretGuitar or
-            //  GameMode.EliteDrums    or
-                GameMode.ProGuitar     or
-            //  GameMode.Dj            or
-                GameMode.ProKeys       => Modifier.None,
+                    GameMode.SixFretGuitar or
+                //  GameMode.EliteDrums    or
+                    GameMode.ProGuitar     or
+                //  GameMode.Dj            or
+                    GameMode.ProKeys       => Modifier.None,
 
-                _  => throw new NotImplementedException($"Unhandled game mode {gameMode}!")
-            };
+                    _  => throw new NotImplementedException($"Unhandled game mode {gameMode}!")
+                };
+            }
+            else
+            {
+                return gameMode switch
+                {
+                    GameMode.FiveFretGuitar =>
+                        Modifier.RangeCompress,
+
+                    _  => throw new NotImplementedException($"Unhandled game mode {gameMode}!")
+                };
+            }
         }
 
         public static Modifier FromSingleModifier(Modifier modifier)
