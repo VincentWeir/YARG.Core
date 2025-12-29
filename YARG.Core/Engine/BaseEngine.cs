@@ -570,7 +570,7 @@ namespace YARG.Core.Engine
 
         public void AwardUnisonBonus()
         {
-            GainStarPower(TicksPerQuarterSpBar);
+            YargLogger.LogDebug("Unison bonus suppressed by config (global no-op).");
             OnUnisonBonusAwarded?.Invoke();
         }
     }
