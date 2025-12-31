@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using YARG.Core.Chart;
 using YARG.Core.Extensions;
 using YARG.Core.IO;
 using YARG.Core.Replays;
@@ -27,7 +28,7 @@ namespace YARG.Core.Engine
         /// Total score across all score values.
         /// </summary>
         /// <remarks>
-        /// Calculated from <see cref="CommittedScore"/>, <see cref="PendingScore"/>, and <see cref="SoloBonuses"/>.
+        /// Calculated from <see cref="CommittedScore"/>, <see cref="PendingScore"/> and <see cref="SoloBonuses"/>.
         /// </remarks>
         public int TotalScore => CommittedScore + PendingScore + SoloBonuses;
 
@@ -45,6 +46,11 @@ namespace YARG.Core.Engine
         /// Total score earned from score multipliers.
         /// </summary>
         public int MultiplierScore;
+
+        /// <summary>
+        /// Total score earned from band bonuses, typically from Star Power/Overdrive activations from other players.
+        /// </summary>
+        public int BandBonusScore;
 
         /// <summary>
         /// The score used to calculate star progress.
@@ -81,6 +87,17 @@ namespace YARG.Core.Engine
         public int ScoreMultiplier;
 
         /// <summary>
+        /// The score multiplier currently applied to the entire band.
+        /// </summary>
+        public int BandMultiplier;
+
+        /// <summary>
+        /// The bonus multiplier awared to this player as a result of other players having Star Power/Overdrive active.
+        /// See also <see cref="BandBonusScore"/>.
+        /// </summary>
+        public int BandBonusMultiplier => IsStarPowerActive ? BandMultiplier - 2 : BandMultiplier - 1;
+
+        /// <summary>
         /// Number of notes which have been hit.
         /// </summary>
         public int NotesHit;
@@ -89,6 +106,11 @@ namespace YARG.Core.Engine
         /// Number of notes in the chart. This value should never be modified.
         /// </summary>
         public int TotalNotes;
+
+        /// <summary>
+        /// Number of chords in the chart. Defaults to total notes, but some instruments calculate differently.
+        /// </summary>
+        public int TotalChords;
 
         /// <summary>
         /// Number of notes which have been missed.
@@ -167,6 +189,21 @@ namespace YARG.Core.Engine
         /// </summary>
         public float Stars;
 
+        /// <summary>
+        /// Is this a full combo?
+        /// </summary>
+        public virtual bool IsFullCombo => MaxCombo == TotalNotes;
+
+        /// <summary>
+        /// The total offset. This, together with notes hit is used to calculate the average offset.
+        /// </summary>
+        private double TotalOffset;
+
+        /// <summary>
+        /// The average offset.
+        /// </summary>
+        private double AverageOffset;
+
         protected BaseStats()
         {
         }
@@ -178,11 +215,17 @@ namespace YARG.Core.Engine
             NoteScore = stats.NoteScore;
             SustainScore = stats.SustainScore;
             MultiplierScore = stats.MultiplierScore;
+            BandBonusScore = stats.BandBonusScore;
             Combo = stats.Combo;
             MaxCombo = stats.MaxCombo;
             ScoreMultiplier = stats.ScoreMultiplier;
+            BandMultiplier = stats.BandMultiplier;
+
             NotesHit = stats.NotesHit;
             TotalNotes = stats.TotalNotes;
+
+            TotalOffset = stats.TotalOffset;
+            AverageOffset = stats.AverageOffset;
 
             StarPowerTickAmount = stats.StarPowerTickAmount;
             TotalStarPowerTicks = stats.TotalStarPowerTicks;
@@ -208,10 +251,18 @@ namespace YARG.Core.Engine
             NoteScore = stream.Read<int>(Endianness.Little);
             SustainScore = stream.Read<int>(Endianness.Little);
             MultiplierScore = stream.Read<int>(Endianness.Little);
+            if (version >= 9)
+            {
+                BandBonusScore = stream.Read<int>(Endianness.Little);
+            }
 
             Combo = stream.Read<int>(Endianness.Little);
             MaxCombo = stream.Read<int>(Endianness.Little);
             ScoreMultiplier = stream.Read<int>(Endianness.Little);
+            if (version >= 9)
+            {
+                BandMultiplier = stream.Read<int>(Endianness.Little);
+            }
 
             NotesHit = stream.Read<int>(Endianness.Little);
             TotalNotes = stream.Read<int>(Endianness.Little);
@@ -240,10 +291,14 @@ namespace YARG.Core.Engine
             NoteScore = 0;
             SustainScore = 0;
             MultiplierScore = 0;
+            BandBonusScore = 0;
             Combo = 0;
             MaxCombo = 0;
             ScoreMultiplier = 1;
+            BandMultiplier = 1;
             NotesHit = 0;
+            TotalOffset = 0.0;
+            AverageOffset = 0.0;
             // Don't reset TotalNotes
             // TotalNotes = 0;
 
@@ -271,10 +326,12 @@ namespace YARG.Core.Engine
             writer.Write(NoteScore);
             writer.Write(SustainScore);
             writer.Write(MultiplierScore);
+            writer.Write(BandBonusScore);
 
             writer.Write(Combo);
             writer.Write(MaxCombo);
             writer.Write(ScoreMultiplier);
+            writer.Write(BandMultiplier);
 
             writer.Write(NotesHit);
             writer.Write(TotalNotes);
@@ -297,5 +354,27 @@ namespace YARG.Core.Engine
         }
 
         public abstract ReplayStats ConstructReplayStats(string name);
+
+        public double GetAverageOffset()
+        {
+            return NotesHit > 0 ? TotalOffset / NotesHit : 0.0;
+        }
+
+        public void IncrementNotesHit<NoteType>(NoteType note, double current_time) where NoteType : Note<NoteType>
+        {
+            ++NotesHit;
+            TotalOffset += current_time - note.Time;
+        }
+
+        /// <summary>
+        /// Increment notes-hit by a specific count (e.g. when a chord of multiple gems is counted separately).
+        /// Also adds the corresponding offset for each note counted so average offset remains correct.
+        /// </summary>
+        public void IncrementNotesHitBy<NoteType>(NoteType note, double current_time, int count) where NoteType : Note<NoteType>
+        {
+            if (count <= 0) return;
+            NotesHit += count;
+            TotalOffset += (current_time - note.Time) * count;
+        }
     }
 }

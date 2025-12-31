@@ -557,9 +557,26 @@ namespace YARG.Core.Engine
 
         protected void IncrementCombo()
         {
-            BaseStats.Combo++;
+            // Backwards-compatible single-unit increment; uses the new multi-unit helper.
+            IncrementComboBy(1);
+        }
+
+        /// <summary>
+        /// Increment the current combo by a specific count and update MaxCombo.
+        /// Fires the OnComboIncrement event once with the total band-units increased.
+        /// </summary>
+        protected void IncrementComboBy(int count)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            BaseStats.Combo += count;
             BaseStats.MaxCombo = Math.Max(BaseStats.MaxCombo, BaseStats.Combo);
-            OnComboIncrement?.Invoke(BaseStats.BandComboUnits);
+
+            // Fire combo increment event using band units (band units per note * count)
+            OnComboIncrement?.Invoke(BaseStats.BandComboUnits * count);
         }
 
         protected void ResetCombo()

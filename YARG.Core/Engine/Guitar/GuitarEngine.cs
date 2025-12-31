@@ -48,7 +48,7 @@ namespace YARG.Core.Engine.Guitar
 
         protected GuitarEngine(InstrumentDifficulty<GuitarNote> chart, SyncTrack syncTrack,
             GuitarEngineParameters engineParameters, bool isBot)
-            : base(chart, syncTrack, engineParameters, false, isBot)
+            : base(chart, syncTrack, engineParameters, true, isBot) // treat chords separately
         {
             StrumLeniencyTimer = new EngineTimer("Strum Leniency", engineParameters.StrumLeniency);
             HopoLeniencyTimer = new EngineTimer("HOPO Leniency", engineParameters.HopoLeniency);
@@ -204,24 +204,17 @@ namespace YARG.Core.Engine.Guitar
             // Detect if the last note(s) were skipped
             bool skipped = SkipPreviousNotes(note);
 
-            if (note.IsStarPower && note.IsStarPowerEnd)
+            if (note.IsStarPower)
             {
-                // Save SP amount before AwardStarPower() runs
-                uint before = BaseStats.StarPowerTickAmount;
-
-                // Play audio + visual effects + stats logic
-                AwardStarPower(note);
-
-                // Calculate how many ticks AwardStarPower added
-                uint gained = BaseStats.StarPowerTickAmount - before;
-
-                // Remove ONLY the unwanted default gain
-                BaseStats.StarPowerTickAmount -= gained;
-
-                // Add your fixed 1/4 SP bar
-                GainStarPower(TicksPerQuarterSpBar);
-
-                EngineStats.StarPowerPhrasesHit++;
+                if (EngineStats.IsStarPowerActive && EngineParameters.NoStarPowerOverlap)
+                {
+                    StripStarPower(note);
+                }
+                else if (note.IsStarPowerEnd)
+                {
+                    AwardStarPower(note);
+                    EngineStats.StarPowerPhrasesHit++;
+                }
             }
 
             if (note.IsSoloStart)
@@ -239,9 +232,14 @@ namespace YARG.Core.Engine.Guitar
                 EndSolo();
             }
 
-            IncrementCombo();
+            // If chords are treated as separate, use the chord gem count for combo and notes hit.
+            int notesToAdd = GetNumberOfNotes(note);
 
-            EngineStats.NotesHit++;
+            // Increment combo by the number of gems in the chord (1 for a single note).
+            IncrementComboBy(notesToAdd);
+
+            // Increment notes hit by the chord gem count so NotesHit aligns with TotalNotes.
+            EngineStats.IncrementNotesHitBy(note, CurrentTime, notesToAdd);
 
             UpdateMultiplier();
 
@@ -379,7 +377,7 @@ namespace YARG.Core.Engine.Guitar
                 }
             }
 
-            YargLogger.LogDebug($"[Vocals] Base score: {score}, Max Combo: {combo}");
+            YargLogger.LogDebug($"[Guitar] Base score: {score}, Max Combo: {combo}");
             return (int) Math.Round(score);
         }
 
