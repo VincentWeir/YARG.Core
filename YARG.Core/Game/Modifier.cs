@@ -53,10 +53,7 @@ namespace YARG.Core.Game
                         Modifier.NoKicks    |
                         Modifier.NoDynamics,
 
-                    GameMode.Vocals =>
-                        Modifier.UnpitchedOnly |
-                        Modifier.NoVocalPercussion,
-
+                    GameMode.Vocals        or
                     GameMode.SixFretGuitar or
                 //  GameMode.EliteDrums    or
                     GameMode.ProGuitar     or
@@ -72,6 +69,15 @@ namespace YARG.Core.Game
                 {
                     GameMode.FiveFretGuitar =>
                         Modifier.RangeCompress,
+
+                    GameMode.FourLaneDrums or
+                    GameMode.FiveLaneDrums or
+                    GameMode.Vocals        or
+                    GameMode.SixFretGuitar or
+                //  GameMode.EliteDrums    or
+                    GameMode.ProGuitar     or
+                //  GameMode.Dj            or
+                    GameMode.ProKeys       => Modifier.None,
 
                     _  => throw new NotImplementedException($"Unhandled game mode {gameMode}!")
                 };
