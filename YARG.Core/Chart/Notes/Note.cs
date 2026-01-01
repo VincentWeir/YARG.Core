@@ -94,10 +94,40 @@ namespace YARG.Core.Chart
         public bool WasHit;
         public bool WasMissed;
 
+        // Backing field for lift-note flag
+        private bool _isLiftNote;
+
+        /// <summary>
+        /// Whether this note has a sustain-end "lift" note that should be treated as an extra "note".
+        /// This is set by the gameplay visuals when they instantiate a sustain-end prefab.
+        /// Setting this property raises OnLiftNoteChanged so engines can update TotalNotes dynamically.
+        /// </summary>
+        public bool IsLiftNote
+        {
+            get => _isLiftNote;
+            set
+            {
+                if (_isLiftNote == value)
+                {
+                    return;
+                }
+
+                _isLiftNote = value;
+                OnLiftNoteChanged?.Invoke((TNote)this, value);
+            }
+        }
+
+        /// <summary>
+        /// Event fired when IsLiftNote changes. Parameters: (note, newValue)
+        /// Engine code subscribes to this to adjust TotalNotes dynamically.
+        /// </summary>
+        public Action<TNote, bool>? OnLiftNoteChanged;
+
         protected Note(NoteFlags flags, double time, double timeLength, uint tick, uint tickLength)
             : base(time, timeLength, tick, tickLength)
         {
             Flags = _flags = flags;
+            _isLiftNote = false;
         }
 
         protected Note(Note<TNote> other) : base(other)
@@ -105,6 +135,9 @@ namespace YARG.Core.Chart
             Flags = _flags = other._flags;
 
             // Child notes are not added here, since this is called before the inheritor's constructor is
+
+            // Copy new field so clones keep the lift-note marker
+            _isLiftNote = other._isLiftNote;
         }
 
         public virtual void AddChildNote(TNote note)
@@ -241,6 +274,9 @@ namespace YARG.Core.Chart
             {
                 childNote.ResetNoteState();
             }
+
+            // Clear lift-note marker when resetting visual/game state (defensive)
+            _isLiftNote = false;
         }
 
         protected static int GetNoteMask(int note)
@@ -264,6 +300,9 @@ namespace YARG.Core.Chart
             Flags = other.Flags;
 
             CopyFlags(other);
+
+            // Preserve the lift-note marker when copying values
+            _isLiftNote = other._isLiftNote;
         }
 
         public void ActivateFlag(NoteFlags noteFlag)
@@ -308,6 +347,8 @@ namespace YARG.Core.Chart
         public TNote CloneWithoutChildNotes()
         {
             var newNote = CloneNote();
+            // Copy properties/flags (including IsLiftNote) into the new instance
+            newNote.CopyValuesFrom((TNote)this);
             return newNote;
         }
     }

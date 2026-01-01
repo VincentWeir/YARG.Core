@@ -53,6 +53,8 @@ namespace YARG.Core.Engine
         protected readonly List<TNoteType> Notes;
         protected readonly TEngineParams   EngineParameters;
 
+        private const double SUSTAIN_END_TOLERANCE = 0.05; // matches visual tolerance
+
         public override BaseEngineParameters BaseParameters => EngineParameters;
         public override BaseStats            BaseStats      => EngineStats;
 
@@ -82,6 +84,38 @@ namespace YARG.Core.Engine
                 EngineStats.TotalNotes = Notes.Count;
             }
 
+            // --- NEW: account for chart sustains that are likely to spawn a sustain-end visual ---
+            // We cannot read the player's runtime NoteSpeed in the engine, so we use tempo-based logic
+            // analogous to the visual's behavior to estimate which sustains will spawn a sustain end.
+            // For each note (parent + children), if it's a sustain (TimeLength > 0) and its TimeLength is short enough
+            // for the sustain-end condition at that note's tempo, count it as an extra note.
+            try
+            {
+                int extraLiftNotes = 0;
+                foreach (var parent in Notes)
+                {
+                    foreach (var n in parent.AllNotes)
+                    {
+                        // Use TimeLength to detect a sustain (works for all note types)
+                        if (n.TimeLength <= 0)
+                            continue;
+
+                        if (WillSpawnSustainEnd(n))
+                        {
+                            extraLiftNotes++;
+                        }
+                    }
+                }
+
+                EngineStats.TotalNotes += extraLiftNotes;
+            }
+            catch (Exception ex)
+            {
+                // Defensive: don't allow any tempo lookup issues to crash initialization.
+                YargLogger.LogFormatWarning("Failed while estimating sustain-end notes: {0}", ex);
+            }
+            // --- END NEW ---
+
             EngineStats.TotalStarPowerPhrases = Chart.Phrases.Count((phrase) => phrase.Type == PhraseType.StarPower);
 
             TicksPerSustainPoint = SyncTrack.Resolution / (double) POINTS_PER_BEAT;
@@ -99,6 +133,56 @@ namespace YARG.Core.Engine
             }
 
             Solos = GetSoloSections();
+        }
+
+        /// <summary>
+        /// Estimate whether the visual sustain-end prefab would be spawned for this note.
+        /// This uses tempo at the note's tick and applies the same heuristic as the visual:
+        /// maxSustainLength = min(30 / bpm, 1.0); spawn if TimeLength <= maxSustainLength + tolerance.
+        /// We cannot access the player's NoteSpeed here, so we assume note speed of 1.0 which
+        /// is the safest baseline for counting potential lift notes.
+        /// </summary>
+        private bool WillSpawnSustainEnd(TNoteType note)
+        {
+            // Guard: only consider actual sustains (TimeLength > 0 indicates sustain)
+            if (note.TimeLength <= 0)
+                return false;
+
+            // Get BPM at the note's tick from the sync track tempos (defensive)
+            double bpm = 120.0;
+            try
+            {
+                var temposField = SyncTrack?.Tempos;
+                if (temposField != null && temposField.Count > 0)
+                {
+                    for (int i = temposField.Count - 1; i >= 0; i--)
+                    {
+                        var t = temposField[i];
+                        if (t.Tick <= note.Tick)
+                        {
+                            bpm = t.BeatsPerMinute;
+                            break;
+                        }
+                    }
+
+                    // If all tempos are after this note, use the first tempo
+                    if (temposField[0].Tick > note.Tick)
+                    {
+                        bpm = temposField[0].BeatsPerMinute;
+                    }
+                }
+            }
+            catch
+            {
+                // If tempo lookup fails, fall back to 120 BPM
+                bpm = 120.0;
+            }
+
+            // Compute the visual's max sustain length heuristic (note-speed assumed 1.0)
+            double maxSustainLength = Math.Min(30.0 / bpm, 1.0);
+
+            // Compare note time length against threshold + tolerance
+            return note.TimeLength <= maxSustainLength + SUSTAIN_END_TOLERANCE;
         }
 
         protected override void GenerateQueuedUpdates(double nextTime)
@@ -310,6 +394,50 @@ namespace YARG.Core.Engine
             }
         }
 
+        /// <summary>
+        /// Finalize a sustain: award any lift-notes (if present) and invoke the OnSustainEnd event.
+        /// This helper will award as many lift-notes as are present on the sustain's parent/child notes
+        /// minus any already-awarded count stored on the sustain.
+        /// Important: this helper assumes sustain scoring (AddScore / EngineStats.SustainScore) has already been handled
+        /// by the caller (e.g. UpdateSustains or Overstrum logic) to avoid double-scoring of sustain points.
+        /// </summary>
+        /// <param name="sustain">Reference to the active sustain entry.</param>
+        /// <param name="finishedScoring">Whether the sustain finished scoring (true for natural end, may be false for early breaks depending on your logic).</param>
+        protected void FinalizeSustain(ref ActiveSustain<TNoteType> sustain, bool finishedScoring)
+        {
+            // Count how many lift-notes exist on this sustain (parent + all child notes).
+            int totalLiftNotes = 0;
+            foreach (var n in sustain.Note.AllNotes)
+            {
+                if (n.IsLiftNote)
+                {
+                    totalLiftNotes++;
+                }
+            }
+
+            // Determine how many new lift-notes to award (if any)
+            int toAward = totalLiftNotes - sustain.LiftNoteAwardedCount;
+            if (toAward > 0)
+            {
+                // Increment notes hit and offset by the number of lift notes awarded
+                EngineStats.IncrementNotesHitBy(sustain.Note, CurrentTime, toAward);
+
+                // Increment combo / max combo by the number awarded
+                IncrementComboBy(toAward);
+
+                // Award single-note points for each lift note and track in NoteScore
+                int points = POINTS_PER_NOTE * toAward;
+                AddScore(points);
+                EngineStats.NoteScore += POINTS_PER_NOTE * toAward;
+
+                // Record that we've awarded these lift notes so we don't double-up
+                sustain.LiftNoteAwardedCount += toAward;
+            }
+
+            // Fire existing sustain end event so UI/other systems are notified
+            OnSustainEnd?.Invoke(sustain.Note, CurrentTime, finishedScoring);
+        }
+
         protected void StartWhammyTimer(double time)
         {
             if (!StarPowerWhammyTimer.IsActive)
@@ -392,6 +520,8 @@ namespace YARG.Core.Engine
                     }
                 }
             }
+
+            OnStarPowerPhraseMissed?.Invoke(null);
         }
 
         public override void Reset(bool keepCurrentButtons = false)
@@ -573,21 +703,40 @@ namespace YARG.Core.Engine
                             sustain.Note.Tick, CurrentTime, dropped, isBurst);
 
                         double finalScore = CalculateSustainPoints(ref sustain, sustainTick);
-                        var points = (int) Math.Ceiling(finalScore);
 
-                        AddScore(points);
-                        ulong timeAsUlong = UnsafeExtensions.DoubleToUInt64Bits(CurrentTime);
-                        ulong baseScoreAsUlong = UnsafeExtensions.DoubleToUInt64Bits(sustain.BaseScore);
-                        YargLogger.LogFormatTrace("Added {0} points for end of sustain at {1} (0x{2}). Base Score/Tick: {3} (0x{4}), {5}", points, CurrentTime, timeAsUlong.ToString("X"), sustain.BaseScore, baseScoreAsUlong.ToString("X"), sustain.BaseTick);
-
-                        // SustainPoints must include the multiplier, but NOT the star power multiplier
-                        int sustainPoints = points * EngineStats.ScoreMultiplier;
-                        if (EngineStats.IsStarPowerActive)
+                        // NEW: if this sustain has a visual sustain-end (lift note), do not award sustain hold points.
+                        // The hold should not grant sustain points for notes that use a sustainEndInstance; the note's
+                        // "lift note" will be awarded separately via FinalizeSustain.
+                        int points;
+                        if (sustain.Note.IsLiftNote)
                         {
-                            sustainPoints /= 2;
+                            points = 0;
+                        }
+                        else
+                        {
+                            points = (int) Math.Ceiling(finalScore);
                         }
 
-                        EngineStats.SustainScore += sustainPoints;
+                        if (points > 0)
+                        {
+                            AddScore(points);
+                            ulong timeAsUlong = UnsafeExtensions.DoubleToUInt64Bits(CurrentTime);
+                            ulong baseScoreAsUlong = UnsafeExtensions.DoubleToUInt64Bits(sustain.BaseScore);
+                            YargLogger.LogFormatTrace("Added {0} points for end of sustain at {1} (0x{2}). Base Score/Tick: {3} (0x{4}), {5}", points, CurrentTime, timeAsUlong.ToString("X"), sustain.BaseScore, baseScoreAsUlong.ToString("X"), sustain.BaseTick);
+
+                            // SustainPoints must include the multiplier, but NOT the star power multiplier
+                            int sustainPoints = points * EngineStats.ScoreMultiplier;
+                            if (EngineStats.IsStarPowerActive)
+                            {
+                                sustainPoints /= 2;
+                            }
+
+                            EngineStats.SustainScore += sustainPoints;
+                        }
+                        else
+                        {
+                            YargLogger.LogFormatTrace("Skipped sustain hold points for lift-note sustain ({0}) at {1}", sustain.Note.Tick, CurrentTime);
+                        }
                     }
                     else
                     {
@@ -595,9 +744,13 @@ namespace YARG.Core.Engine
 
                         var sustainPoints = (int) Math.Ceiling(score);
 
-                        // It's ok to use multiplier here because PendingScore is only temporary to show the correct
-                        // score on the UI.
-                        EngineStats.PendingScore += sustainPoints * EngineStats.ScoreMultiplier;
+                        // NEW: don't add pending sustain points for lift-note sustains
+                        if (!sustain.Note.IsLiftNote)
+                        {
+                            // It's ok to use multiplier here because PendingScore is only temporary to show the correct
+                            // score on the UI.
+                            EngineStats.PendingScore += sustainPoints * EngineStats.ScoreMultiplier;
+                        }
                     }
                 }
 
@@ -629,7 +782,8 @@ namespace YARG.Core.Engine
             YargLogger.LogFormatTrace("Ended sustain ({0}) at {1} (dropped: {2}, end: {3})", sustain.Note.Tick, CurrentTime, dropped, isEndOfSustain);
             ActiveSustains.RemoveAt(sustainIndex);
 
-            OnSustainEnd?.Invoke(sustain.Note, CurrentTime, sustain.HasFinishedScoring);
+            // Use FinalizeSustain to handle awarding any lift-notes and invoking the OnSustainEnd event.
+            FinalizeSustain(ref sustain, sustain.HasFinishedScoring);
         }
 
         protected override void UpdateStarPower()
@@ -668,7 +822,7 @@ namespace YARG.Core.Engine
                     BaseStats.StarPowerTickAmount -= drain;
                 }
 
-                YargLogger.LogFormatTrace("Drained {0} ticks of SP this update. New SP tick amount: {1}. Current SP Tick: {2}, Last: {3}", drain, BaseStats.StarPowerTickAmount, StarPowerTickPosition, PreviousStarPowerTickPosition);
+                YargLogger.LogFormatTrace("Drained {0} ticks of SP this update. New SP Tick Amount: {1}. Current SP Tick: {2}, Last: {3}", drain, BaseStats.StarPowerTickAmount, StarPowerTickPosition, PreviousStarPowerTickPosition);
 
                 double spTimeDelta = CurrentTime - StarPowerActivationTime;
                 BaseStats.TimeInStarPower = spTimeDelta + BaseTimeInStarPower;
