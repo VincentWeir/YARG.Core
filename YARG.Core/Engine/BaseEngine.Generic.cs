@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using YARG.Core.Chart;
@@ -84,38 +84,6 @@ namespace YARG.Core.Engine
                 EngineStats.TotalNotes = Notes.Count;
             }
 
-            // --- NEW: account for chart sustains that are likely to spawn a sustain-end visual ---
-            // We cannot read the player's runtime NoteSpeed in the engine, so we use tempo-based logic
-            // analogous to the visual's behavior to estimate which sustains will spawn a sustain end.
-            // For each note (parent + children), if it's a sustain (TimeLength > 0) and its TimeLength is short enough
-            // for the sustain-end condition at that note's tempo, count it as an extra note.
-            try
-            {
-                int extraLiftNotes = 0;
-                foreach (var parent in Notes)
-                {
-                    foreach (var n in parent.AllNotes)
-                    {
-                        // Use TimeLength to detect a sustain (works for all note types)
-                        if (n.TimeLength <= 0)
-                            continue;
-
-                        if (WillSpawnSustainEnd(n))
-                        {
-                            extraLiftNotes++;
-                        }
-                    }
-                }
-
-                EngineStats.TotalNotes += extraLiftNotes;
-            }
-            catch (Exception ex)
-            {
-                // Defensive: don't allow any tempo lookup issues to crash initialization.
-                YargLogger.LogFormatWarning("Failed while estimating sustain-end notes: {0}", ex);
-            }
-            // --- END NEW ---
-
             EngineStats.TotalStarPowerPhrases = Chart.Phrases.Count((phrase) => phrase.Type == PhraseType.StarPower);
 
             TicksPerSustainPoint = SyncTrack.Resolution / (double) POINTS_PER_BEAT;
@@ -133,56 +101,6 @@ namespace YARG.Core.Engine
             }
 
             Solos = GetSoloSections();
-        }
-
-        /// <summary>
-        /// Estimate whether the visual sustain-end prefab would be spawned for this note.
-        /// This uses tempo at the note's tick and applies the same heuristic as the visual:
-        /// maxSustainLength = min(30 / bpm, 1.0); spawn if TimeLength <= maxSustainLength + tolerance.
-        /// We cannot access the player's NoteSpeed here, so we assume note speed of 1.0 which
-        /// is the safest baseline for counting potential lift notes.
-        /// </summary>
-        private bool WillSpawnSustainEnd(TNoteType note)
-        {
-            // Guard: only consider actual sustains (TimeLength > 0 indicates sustain)
-            if (note.TimeLength <= 0)
-                return false;
-
-            // Get BPM at the note's tick from the sync track tempos (defensive)
-            double bpm = 120.0;
-            try
-            {
-                var temposField = SyncTrack?.Tempos;
-                if (temposField != null && temposField.Count > 0)
-                {
-                    for (int i = temposField.Count - 1; i >= 0; i--)
-                    {
-                        var t = temposField[i];
-                        if (t.Tick <= note.Tick)
-                        {
-                            bpm = t.BeatsPerMinute;
-                            break;
-                        }
-                    }
-
-                    // If all tempos are after this note, use the first tempo
-                    if (temposField[0].Tick > note.Tick)
-                    {
-                        bpm = temposField[0].BeatsPerMinute;
-                    }
-                }
-            }
-            catch
-            {
-                // If tempo lookup fails, fall back to 120 BPM
-                bpm = 120.0;
-            }
-
-            // Compute the visual's max sustain length heuristic (note-speed assumed 1.0)
-            double maxSustainLength = Math.Min(30.0 / bpm, 1.0);
-
-            // Compare note time length against threshold + tolerance
-            return note.TimeLength <= maxSustainLength + SUSTAIN_END_TOLERANCE;
         }
 
         protected override void GenerateQueuedUpdates(double nextTime)
