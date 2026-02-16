@@ -170,6 +170,23 @@ namespace YARG.Core.Engine.Guitar.Engines
 
             if (HasFretted)
             {
+                // LOGIC BELOW PREVENTS PULL-OFFS FOR TAPS
+                // if (note.IsTap)
+                // {
+                //     // Only allow tapping when buttons are ADDED (pressed), not when removed (pull-off)
+                //     // Check if the new button mask has MORE bits set than the last one
+                //     bool buttonsAdded = (EffectiveButtonMask & ~LastButtonMask) != 0;
+                    
+                //     if (buttonsAdded)
+                //     {
+                //         HasTapped = true;
+                //     }
+                // }
+                // else
+                // {
+                //     HasTapped = true;
+                // }
+
                 HasTapped = true;
 
                 // This is the time the front end will expire. Used for hit logic with infinite front end
