@@ -16,6 +16,7 @@ namespace YARG.Core.Game
 
         public const int DEFAULT_MAX_MULTIPLIER = 4;
         public const int BASS_MAX_MULTIPLIER    = 6;
+        public const int KEYS_MAX_MULTIPLIER    = 6;
 
         /// <summary>
         /// A preset for a hit window. This should
@@ -125,12 +126,17 @@ namespace YARG.Core.Game
                 };
             }
 
-            public GuitarEngineParameters Create(float[] starMultiplierThresholds, bool isBass)
+            public GuitarEngineParameters Create(float[] starMultiplierThresholds, bool isBass, bool isKeys)
             {
                 var hitWindow = HitWindow.Create();
+
+                int maxMultiplier = isBass ? BASS_MAX_MULTIPLIER
+                                    : isKeys ? KEYS_MAX_MULTIPLIER
+                                    : DEFAULT_MAX_MULTIPLIER;
+
                 return new GuitarEngineParameters(
                     hitWindow,
-                    isBass ? BASS_MAX_MULTIPLIER : DEFAULT_MAX_MULTIPLIER,
+                    maxMultiplier,
                     DEFAULT_WHAMMY_BUFFER,
                     SustainDropLeniency,
                     starMultiplierThresholds,

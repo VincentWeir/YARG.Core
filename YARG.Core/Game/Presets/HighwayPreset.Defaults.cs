@@ -5,8 +5,8 @@ namespace YARG.Core.Game
 {
     public partial class HighwayPreset : BasePreset
     {
-        public static HighwayPreset Default = new("Default", true);
-        public static HighwayPreset Basic = new("Basic", true)
+        public static HighwayPreset Default = new("Classic", true);
+        public static HighwayPreset Basic = new("Default", true)
         {
             StarPowerColor = Color.FromArgb(0, 0, 0, 0),
             BackgroundPatternColor = Color.FromArgb(0, 0, 0, 0),
@@ -15,7 +15,7 @@ namespace YARG.Core.Game
             BackgroundGrooveBaseColor1 = Color.FromArgb(255, 15, 15, 15),
             BackgroundGrooveBaseColor2 = Color.FromArgb(0, 0, 0, 0)
         };
-        public static HighwayPreset NoGroove = new("No Groove", true)
+        public static HighwayPreset NoGroove = new("Classic, No Groove", true)
         {
             BackgroundGroovePatternColor = Color.FromArgb(255, 87, 87, 87),
             BackgroundGrooveBaseColor1 = Color.FromArgb(255, 15, 15, 15),
@@ -24,8 +24,8 @@ namespace YARG.Core.Game
 
         public static readonly List<HighwayPreset> Defaults = new()
         {
-            Default,
             Basic,
+            Default,
             NoGroove
         };
     }

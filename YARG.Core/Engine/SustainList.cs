@@ -113,6 +113,11 @@ namespace YARG.Core.Engine
 
         public double LeniencyDropTime;
 
+        // UPDATED: track how many lift-notes have already been awarded for this sustain.
+        // If a chord contains multiple lift notes (parent + children), we can award them all,
+        // and this counter prevents duplicates.
+        public int LiftNoteAwardedCount;
+
         public ActiveSustain(TNoteType note)
         {
             Note = note;
@@ -123,6 +128,8 @@ namespace YARG.Core.Engine
             IsLeniencyHeld = false;
 
             LeniencyDropTime = -9999;
+
+            LiftNoteAwardedCount = 0;
         }
 
         public double GetEndTime(SyncTrack syncTrack, uint sustainBurstThreshold)
@@ -130,10 +137,12 @@ namespace YARG.Core.Engine
             // Sustain is too short for a burst, so clamp the burst to the start position of the note
             if (sustainBurstThreshold > Note.TickLength)
             {
-                return Note.Time;
+                return syncTrack.TickToTime(Note.Tick + Note.TickLength);
             }
 
-            return syncTrack.TickToTime(Note.TickEnd - sustainBurstThreshold);
+            // Calculate the normal burst time
+            uint burstStartTick = Note.Tick + (Note.TickLength - sustainBurstThreshold);
+            return syncTrack.TickToTime(burstStartTick);
         }
     }
 }
