@@ -365,5 +365,16 @@ namespace YARG.Core.Engine
             ++NotesHit;
             TotalOffset += current_time - note.Time;
         }
+
+        /// <summary>
+        /// Increment notes-hit by a specific count (e.g. when a chord of multiple gems is counted separately).
+        /// Also adds the corresponding offset for each note counted so average offset remains correct.
+        /// </summary>
+        public void IncrementNotesHitBy<NoteType>(NoteType note, double current_time, int count) where NoteType : Note<NoteType>
+        {
+            if (count <= 0) return;
+            NotesHit += count;
+            TotalOffset += (current_time - note.Time) * count;
+        }
     }
 }

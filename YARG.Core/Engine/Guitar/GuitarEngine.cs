@@ -48,7 +48,7 @@ namespace YARG.Core.Engine.Guitar
 
         protected GuitarEngine(InstrumentDifficulty<GuitarNote> chart, SyncTrack syncTrack,
             GuitarEngineParameters engineParameters, bool isBot)
-            : base(chart, syncTrack, engineParameters, false, isBot)
+            : base(chart, syncTrack, engineParameters, true, isBot) // treat chords separately
         {
             StrumLeniencyTimer = new EngineTimer("Strum Leniency", engineParameters.StrumLeniency);
             HopoLeniencyTimer = new EngineTimer("HOPO Leniency", engineParameters.HopoLeniency);
@@ -232,9 +232,14 @@ namespace YARG.Core.Engine.Guitar
                 EndSolo();
             }
 
-            IncrementCombo();
+            // If chords are treated as separate, use the chord gem count for combo and notes hit.
+            int notesToAdd = GetNumberOfNotes(note);
 
-            EngineStats.IncrementNotesHit(note, CurrentTime);
+            // Increment combo by the number of gems in the chord (1 for a single note).
+            IncrementComboBy(notesToAdd);
+
+            // Increment notes hit by the chord gem count so NotesHit aligns with TotalNotes.
+            EngineStats.IncrementNotesHitBy(note, CurrentTime, notesToAdd);
 
             UpdateMultiplier();
 
