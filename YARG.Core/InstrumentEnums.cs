@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using YARG.Core.Chart;
-using YARG.Core.Song;
 
 namespace YARG.Core
 {
@@ -22,11 +20,11 @@ namespace YARG.Core
         // 5-9: Drums
         FourLaneDrums = 5,
         FiveLaneDrums = 6,
-        EliteDrums = 7,
+        // EliteDrums = 7,
 
         // 10-14: Pro instruments
         ProGuitar = 10,
-        ProKeys = 11, // Includes Pro and Five-Lane
+        ProKeys = 11,
 
         // 15-19: Vocals
         Vocals = 15,
@@ -111,21 +109,9 @@ namespace YARG.Core
         All = Beginner | Easy | Medium | Hard | Expert | ExpertPlus,
     }
 
-    /// <summary>
-    /// Available drum star power activation types.
-    /// </summary>
-    public enum StarPowerActivationType : byte
-    {
-        // Ordered chronologically -- DO NOT REORDER!!
-        Freestyle     = 0, // Old Rock Band style    // TODO: Implement
-        RightmostLane = 1, // Modern Rock Band style // TODO: Implement
-        RightmostNote = 2, // Clone Hero style
-        AllNotes      = 3, // Old YARG style
-    }
-
     public static class ChartEnumExtensions
     {
-        public static GameMode ToNativeGameMode(this Instrument instrument)
+        public static GameMode ToGameMode(this Instrument instrument)
         {
             return instrument switch
             {
@@ -145,7 +131,7 @@ namespace YARG.Core
 
                 Instrument.FiveLaneDrums => GameMode.FiveLaneDrums,
 
-                Instrument.EliteDrums => GameMode.EliteDrums,
+                // Instrument.EliteDrums => GameMode.EliteDrums,
 
                 Instrument.ProGuitar_17Fret or
                 Instrument.ProGuitar_22Fret or
@@ -176,46 +162,38 @@ namespace YARG.Core
                     Instrument.FiveFretCoopGuitar,
                     Instrument.Keys,
                 },
-                GameMode.SixFretGuitar => new[]
+                GameMode.SixFretGuitar  => new[]
                 {
                     Instrument.SixFretGuitar,
                     Instrument.SixFretBass,
                     Instrument.SixFretRhythm,
                     Instrument.SixFretCoopGuitar,
                 },
-                GameMode.FourLaneDrums => new[]
+                GameMode.FourLaneDrums  => new[]
                 {
                     Instrument.FourLaneDrums,
                     Instrument.ProDrums,
                 },
-                GameMode.FiveLaneDrums => new[]
+                GameMode.FiveLaneDrums  => new[]
                 {
                     Instrument.FiveLaneDrums
                 },
-                GameMode.EliteDrums => new[]
-                {
-                    Instrument.FourLaneDrums,
-                    Instrument.ProDrums,
-                    Instrument.EliteDrums,
-                    Instrument.FiveLaneDrums,
-                },
-                GameMode.ProGuitar => new[]
+                //GameMode.EliteDrums     => new[]
+                //{
+                //     Instrument.EliteDrums,
+                //},
+                GameMode.ProGuitar      => new[]
                 {
                     Instrument.ProGuitar_17Fret,
                     Instrument.ProGuitar_22Fret,
                     Instrument.ProBass_17Fret,
                     Instrument.ProBass_22Fret,
                 },
-                GameMode.ProKeys => new[]
+                GameMode.ProKeys        => new[]
                 {
-                    Instrument.ProKeys,
-                    Instrument.Keys,
-                    Instrument.FiveFretGuitar,
-                    Instrument.FiveFretBass,
-                    Instrument.FiveFretRhythm,
-                    Instrument.FiveFretCoopGuitar
+                    Instrument.ProKeys
                 },
-                GameMode.Vocals => new[]
+                GameMode.Vocals         => new[]
                 {
                     Instrument.Vocals,
                     Instrument.Harmony
@@ -225,26 +203,7 @@ namespace YARG.Core
                 //     Instrument.DjSingle,
                 //     Instrument.DjDouble,
                 // },
-                _ => throw new NotImplementedException($"Unhandled game mode {gameMode}!")
-            };
-        }
-
-        public static Instrument[] PossibleInstrumentsForSong(this GameMode gameMode, SongEntry entry)
-        {
-            return gameMode switch
-            {
-                GameMode.EliteDrums     => entry.HasInstrument(Instrument.FiveLaneDrums) ?
-                    new[]
-                    {
-                        Instrument.FiveLaneDrums,
-                        //Instrument.EliteDrums,
-                    } :
-                    new[] {
-                        Instrument.FourLaneDrums,
-                        Instrument.ProDrums,
-                        //Instrument.EliteDrums,
-                    },
-                _  => PossibleInstruments(gameMode)
+                _  => throw new NotImplementedException($"Unhandled game mode {gameMode}!")
             };
         }
 

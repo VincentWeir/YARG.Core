@@ -13,7 +13,7 @@ namespace YARG.Core.Engine.Vocals
 
         public delegate void TargetNoteChangeEvent(VocalNote targetNote);
 
-        public delegate void PhraseHitEvent(double hitPercentAfterParams, bool fullPoints, bool isLastPhrase);
+        public delegate void PhraseHitEvent(double hitPercentAfterParams, bool fullPoints);
 
         public TargetNoteChangeEvent? OnTargetNoteChanged;
 
@@ -162,7 +162,7 @@ namespace YARG.Core.Engine.Vocals
                 }
 
                 // No matter what, we still wanna count this as a phrase hit though
-                EngineStats.IncrementNotesHit(note, CurrentTime);
+                EngineStats.NotesHit++;
 
                 OnNoteHit?.Invoke(NoteIndex, note);
 

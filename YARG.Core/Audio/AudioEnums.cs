@@ -19,8 +19,7 @@
         Drums3,
         Drums4,
         Crowd,
-        Preview,
-        VoxSample,
+        Preview
     }
 
     public enum SfxSample
@@ -29,7 +28,6 @@
         StarPowerAward,
         StarPowerGain,
         StarPowerDeploy,
-        StarPowerDeployCrowd,
         StarPowerRelease,
         Clap,
         StarGain,
@@ -38,14 +36,6 @@
         Overstrum2,
         Overstrum3,
         Overstrum4,
-        CrowdOpen1,
-        CrowdOpen2,
-        CrowdStart,
-        CrowdStart2,
-        CrowdStart3,
-        CrowdEnd1,
-        CrowdEnd2,
-        Chatter
     }
 
     public enum DrumSfxSample
@@ -122,20 +112,6 @@
         Vel2Pad7Smp0,
         Vel2Pad7Smp1,
         Vel2Pad7Smp2
-    }
-
-    public enum VoxSample
-    {
-        FullCombo,
-        Times2,
-        Times3,
-        Times4,
-        Times5,
-        Times6,
-        TimesMany,
-        FullBandFullCombo,
-        HighScore,
-        FailSound
     }
 
     public enum DSPType

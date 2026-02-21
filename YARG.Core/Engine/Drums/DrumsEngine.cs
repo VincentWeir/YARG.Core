@@ -10,7 +10,7 @@ namespace YARG.Core.Engine.Drums
     {
         public delegate void OverhitEvent();
 
-        public delegate void PadHitEvent(DrumsAction action, bool noteWasHit, bool wereBonusPointsAwarded, DrumNoteType type, float velocity);
+        public delegate void PadHitEvent(DrumsAction action, bool noteWasHit, float velocity);
 
         public OverhitEvent? OnOverhit;
         public PadHitEvent?  OnPadHit;
@@ -25,10 +25,8 @@ namespace YARG.Core.Engine.Drums
 
         protected DrumsAction? Action;
 
-        protected bool IsMidiDrumsInput;
-
         protected DrumsEngine(InstrumentDifficulty<DrumNote> chart, SyncTrack syncTrack,
-            DrumsEngineParameters engineParameters, bool isBot, bool isMidiDrumsInput)
+            DrumsEngineParameters engineParameters, bool isBot)
             : base(chart, syncTrack, engineParameters, true, isBot)
         {
             foreach(var note in Notes)
@@ -47,7 +45,6 @@ namespace YARG.Core.Engine.Drums
             }
 
             GetWaitCountdowns(Notes);
-            IsMidiDrumsInput = isMidiDrumsInput;
         }
 
         public override void Reset(bool keepCurrentButtons = false)
@@ -117,18 +114,11 @@ namespace YARG.Core.Engine.Drums
             // Detect if the last note(s) were skipped
             bool skipped = SkipPreviousNotes(note.ParentOrSelf);
 
-            if (note.IsStarPower)
+            // Make sure that the note is fully hit, so the last hit note awards the starpower.
+            if (note.IsStarPower && note.IsStarPowerEnd && note.ParentOrSelf.WasFullyHit())
             {
-                if (EngineStats.IsStarPowerActive && EngineParameters.NoStarPowerOverlap)
-                {
-                    StripStarPower(note);
-                }
-                // Make sure that the note is fully hit, so the last hit note awards the starpower.
-                else if (note.IsStarPowerEnd && note.ParentOrSelf.WasFullyHit())
-                {
-                    AwardStarPower(note);
-                    EngineStats.StarPowerPhrasesHit++;
-                }
+                AwardStarPower(note);
+                EngineStats.StarPowerPhrasesHit++;
             }
 
             if (note.IsSoloStart)
@@ -146,14 +136,15 @@ namespace YARG.Core.Engine.Drums
                 EndSolo();
             }
 
-            if (!activationAutoHit && note.IsStarPowerActivator && CanStarPowerActivate && IsActivationComplete(note))
+            if (!activationAutoHit && note.IsStarPowerActivator && CanStarPowerActivate &&
+                note.ParentOrSelf.WasFullyHit())
             {
                 ActivateStarPower();
             }
 
             IncrementCombo();
 
-            EngineStats.IncrementNotesHit(note, CurrentTime);
+            EngineStats.NotesHit++;
 
             UpdateMultiplier();
 
@@ -167,20 +158,6 @@ namespace YARG.Core.Engine.Drums
             }
 
             base.HitNote(note);
-        }
-
-        // Check if all activation notes in the note chord have been hit
-        private static bool IsActivationComplete(DrumNote drumNote)
-        {
-            foreach (var note in drumNote.ParentOrSelf.AllNotes)
-            {
-                if (note.IsStarPowerActivator && !note.WasHit)
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         protected bool ApplyVelocity(DrumNote hitNote)
@@ -345,11 +322,11 @@ namespace YARG.Core.Engine.Drums
                 // invert it to calculate leniency
                 weight = 1.0 * multiplier / BaseParameters.MaxMultiplier;
 
-                score += weight * (GetPointsPerNote() * (1 + note.ChildNotes.Count));
+                score += weight * (POINTS_PER_NOTE * (1 + note.ChildNotes.Count));
                 combo += 1 + note.ChildNotes.Count;
             }
 
-            YargLogger.LogDebug($"[Drums] Base score: {score}, Max Combo: {combo}");
+            YargLogger.LogDebug($"[Vocals] Base score: {score}, Max Combo: {combo}");
             return (int) Math.Round(score);
         }
 

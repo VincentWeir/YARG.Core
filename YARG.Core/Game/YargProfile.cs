@@ -5,14 +5,13 @@ using YARG.Core.Chart;
 using YARG.Core.Utility;
 using YARG.Core.Extensions;
 using System.Linq;
-using System.Runtime.Serialization;
 using YARG.Core.IO;
 
 namespace YARG.Core.Game
 {
     public class YargProfile
     {
-        private const int PROFILE_VERSION = 6;
+        private const int PROFILE_VERSION = 4;
 
         public Guid Id;
         public string Name;
@@ -36,8 +35,6 @@ namespace YARG.Core.Game
 
         public bool SwapCrashAndRide;
 
-        public StarPowerActivationType StarPowerActivationType;
-
         public int? AutoConnectOrder;
 
         public long InputCalibrationMilliseconds;
@@ -55,19 +52,11 @@ namespace YARG.Core.Game
         public Guid ColorProfile;
         public Guid CameraPreset;
         public Guid HighwayPreset;
-        public Guid RockMeterPreset;
 
         /// <summary>
         /// The selected instrument.
         /// </summary>
         public Instrument CurrentInstrument;
-
-        /// <summary>
-        /// The user's preferred instrument, which may differ from CurrentInstrument when the preferred instrument
-        /// is not available for a given chart. This should only be modified when the user explicitly changes their
-        /// instrument selection when the previous PreferredInstrument is also available.
-        /// </summary>
-        public Instrument PreferredInstrument;
 
         /// <summary>
         /// The selected difficulty.
@@ -106,11 +95,6 @@ namespace YARG.Core.Game
         [JsonProperty]
         public Modifier CurrentModifiers { get; private set; }
 
-        /// <summary>
-        /// The last time this profile was used.
-        /// </summary>
-        public DateTime LastUsed;
-
         public YargProfile()
         {
             Id = Guid.NewGuid();
@@ -124,13 +108,11 @@ namespace YARG.Core.Game
             SplitProTomsAndCymbals = false;
             SwapSnareAndHiHat = false;
             SwapCrashAndRide = false;
-            StarPowerActivationType = StarPowerActivationType.RightmostNote;
 
             // Set preset IDs to default
             ColorProfile = Game.ColorProfile.Default.Id;
             CameraPreset = Game.CameraPreset.Default.Id;
             HighwayPreset = Game.HighwayPreset.Default.Id;
-            RockMeterPreset = Game.RockMeterPreset.Normal.Id;
 
             CurrentModifiers = Modifier.None;
         }
@@ -156,8 +138,6 @@ namespace YARG.Core.Game
             {
                 HighwayPreset = stream.ReadGuid();
             }
-            // This uses CurrentInstrument instead of PreferredInstrument because in replays we only care
-            // what instrument is actually being used for the current chart
             CurrentInstrument = (Instrument) stream.ReadByte();
             CurrentDifficulty = (Difficulty) stream.ReadByte();
             CurrentModifiers = (Modifier) stream.Read<ulong>(Endianness.Little);
@@ -166,6 +146,8 @@ namespace YARG.Core.Game
             NoteSpeed = stream.Read<float>(Endianness.Little);
             HighwayLength = stream.Read<float>(Endianness.Little);
             LeftyFlip = stream.ReadBoolean();
+
+            GameMode = CurrentInstrument.ToGameMode();
 
             if (version >= 3)
             {
@@ -178,23 +160,6 @@ namespace YARG.Core.Game
                 SplitProTomsAndCymbals = stream.ReadBoolean();
                 SwapSnareAndHiHat = stream.ReadBoolean();
                 SwapCrashAndRide = stream.ReadBoolean();
-            }
-
-            if (version >= 5)
-            {
-                StarPowerActivationType = (StarPowerActivationType) stream.ReadByte();
-            }
-            else
-            {
-                StarPowerActivationType = StarPowerActivationType.RightmostNote;
-            }
-
-            if (version >= 6)
-            {
-                GameMode = (GameMode) stream.ReadByte();
-            } else
-            {
-                GameMode = CurrentInstrument.ToNativeGameMode();
             }
         }
 
@@ -223,7 +188,7 @@ namespace YARG.Core.Game
 
         public void ApplyModifiers<TNote>(InstrumentDifficulty<TNote> track) where TNote : Note<TNote>
         {
-            switch (GameMode)
+            switch (CurrentInstrument.ToGameMode())
             {
                 case GameMode.FiveFretGuitar:
                     if (track is not InstrumentDifficulty<GuitarNote> guitarTrack)
@@ -231,6 +196,7 @@ namespace YARG.Core.Game
                         throw new InvalidOperationException("Cannot apply guitar modifiers to non-guitar track " +
                             $"with notes of {typeof(TNote)}!");
                     }
+
                     if (IsModifierActive(Modifier.AllStrums))
                     {
                         guitarTrack.ConvertToGuitarType(GuitarNoteType.Strum);
@@ -259,7 +225,6 @@ namespace YARG.Core.Game
                     break;
                 case GameMode.FourLaneDrums:
                 case GameMode.FiveLaneDrums:
-                case GameMode.EliteDrums:
                     if (track is not InstrumentDifficulty<DrumNote> drumsTrack)
                     {
                         throw new InvalidOperationException("Cannot apply drum modifiers to non-drums track " +
@@ -277,31 +242,9 @@ namespace YARG.Core.Game
                     }
 
                     break;
-                case GameMode.ProKeys:
-                    if (track is InstrumentDifficulty<ProKeysNote> proKeysTrack)
-                    {
-                        // Apply Pro Keys modifiers (none exist currently)
-                        break;
-                    }
-
-                    if (track is InstrumentDifficulty<GuitarNote> fiveLaneKeysTrack)
-                    {
-                        // Apply Five-Lane Keys modifiers
-                        if (IsModifierActive(Modifier.RangeCompress))
-                        {
-                            fiveLaneKeysTrack.CompressGuitarRange();
-                        }
-                        break;
-                    }
-
-                    else
-                    {
-                        throw new InvalidOperationException("Cannot apply keys modifiers to non-keys and non-guitar " +
-                            $"track with notes of {typeof(TNote)}!");
-                    }
                 case GameMode.Vocals:
-                            throw new InvalidOperationException("For vocals, use ApplyVocalModifiers instead!");
-                        }
+                    throw new InvalidOperationException("For vocals, use ApplyVocalModifiers instead!");
+            }
         }
 
         public void ApplyVocalModifiers(VocalsPart vocalsPart)
@@ -319,31 +262,11 @@ namespace YARG.Core.Game
 
         public void EnsureValidInstrument()
         {
+
             if (!HasValidInstrument)
             {
                 CurrentInstrument = GameMode.PossibleInstruments()[0];
             }
-
-            ValidatePreferredInstrument();
-        }
-
-        [OnDeserialized]
-        public void ValidateJsonDeserialization(StreamingContext context)
-        {
-            ValidatePreferredInstrument();
-        }
-
-        private void ValidatePreferredInstrument()
-        {
-            if (!GameMode.PossibleInstruments().Contains(PreferredInstrument))
-            {
-                PreferredInstrument = HasValidInstrument ? CurrentInstrument : GameMode.PossibleInstruments()[0];
-            }
-        }
-
-        public void ClaimProfile()
-        {
-            LastUsed = DateTime.Now;
         }
 
         // For replay serialization
@@ -360,8 +283,6 @@ namespace YARG.Core.Game
             writer.Write(CameraPreset);
             writer.Write(HighwayPreset);
 
-            // This uses CurrentInstrument instead of PreferredInstrument because in replays we only care
-            // what instrument is actually being used for the current chart
             writer.Write((byte) CurrentInstrument);
             writer.Write((byte) CurrentDifficulty);
             writer.Write((ulong) CurrentModifiers);
@@ -377,10 +298,6 @@ namespace YARG.Core.Game
             writer.Write(SplitProTomsAndCymbals);
             writer.Write(SwapSnareAndHiHat);
             writer.Write(SwapCrashAndRide);
-
-            writer.Write((byte) StarPowerActivationType);
-
-            writer.Write((byte) GameMode);
         }
     }
 }

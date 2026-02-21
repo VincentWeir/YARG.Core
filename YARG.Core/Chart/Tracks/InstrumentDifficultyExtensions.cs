@@ -268,32 +268,15 @@ namespace YARG.Core.Chart
                     if (note.IsStarPowerActivator)
                     {
                         // This is a single kick drum note that is a star power activator,
-                        // we have to move it to the NEXT note and adjust the activation phrase end.
+                        // we have to move it to the NEXT note.
                         if (index < difficulty.Notes.Count)
                         {
-                            difficulty.Notes[index].ActivateFlag(DrumNoteFlags.StarPowerActivator);
+                            difficulty.Notes[index].DrumFlags |= DrumNoteFlags.StarPowerActivator;
                             // Also add it to the child notes
                             foreach (var childNote in difficulty.Notes[index].ChildNotes)
                             {
-                                childNote.ActivateFlag(DrumNoteFlags.StarPowerActivator);
+                                childNote.DrumFlags |= DrumNoteFlags.StarPowerActivator;
                             }
-                        }
-
-                        Phrase? activationPhrase = null;
-
-                        foreach (var phrase in difficulty.Phrases)
-                        {
-                            if (phrase.Type == PhraseType.DrumFill && phrase.Time < note.Time && phrase.TimeEnd >= note.Time)
-                            {
-                                activationPhrase = phrase;
-                                break;
-                            }
-                        }
-
-                        if (activationPhrase != null)
-                        {
-                            activationPhrase.TimeLength = difficulty.Notes[index].Time - activationPhrase.Time;
-                            activationPhrase.TickLength = difficulty.Notes[index].Tick - activationPhrase.Tick;
                         }
                     }
 
@@ -303,11 +286,11 @@ namespace YARG.Core.Chart
                         // NEXT note (we don't want to extend the solo).
                         if (index < difficulty.Notes.Count)
                         {
-                            difficulty.Notes[index].ActivateFlag(NoteFlags.SoloStart);
+                            difficulty.Notes[index].Flags |= NoteFlags.SoloStart;
                             // Also add it to the child notes
                             foreach (var childNote in difficulty.Notes[index].ChildNotes)
                             {
-                                childNote.ActivateFlag(NoteFlags.SoloStart);
+                                childNote.Flags |= NoteFlags.SoloStart;
                             }
                         }
                     }
@@ -318,11 +301,11 @@ namespace YARG.Core.Chart
                         // PREVIOUS note (we don't want to extend the solo).
                         if (index > 0)
                         {
-                            difficulty.Notes[index - 1].ActivateFlag(NoteFlags.SoloEnd);
+                            difficulty.Notes[index - 1].Flags |= NoteFlags.SoloEnd;
                             // Also add it to the child notes
                             foreach (var childNote in difficulty.Notes[index - 1].ChildNotes)
                             {
-                                childNote.ActivateFlag(NoteFlags.SoloEnd);
+                                childNote.Flags |= NoteFlags.SoloEnd;
                             }
                         }
                     }
@@ -333,11 +316,11 @@ namespace YARG.Core.Chart
                         // NEXT note (we don't want to extend the starpower section).
                         if (index < difficulty.Notes.Count)
                         {
-                            difficulty.Notes[index].ActivateFlag(NoteFlags.StarPowerStart);
+                            difficulty.Notes[index].Flags |= NoteFlags.StarPowerStart;
                             // Also add it to the child notes
                             foreach (var childNote in difficulty.Notes[index].ChildNotes)
                             {
-                                childNote.ActivateFlag(NoteFlags.StarPowerStart);
+                                childNote.Flags |= NoteFlags.StarPowerStart;
                             }
                         }
                     }
@@ -348,11 +331,11 @@ namespace YARG.Core.Chart
                         // PREVIOUS note (we don't want to extend the starpower section).
                         if (index > 0)
                         {
-                            difficulty.Notes[index - 1].ActivateFlag(NoteFlags.StarPowerEnd);
+                            difficulty.Notes[index - 1].Flags |= NoteFlags.StarPowerEnd;
                             // Also add it to the child notes
                             foreach (var childNote in difficulty.Notes[index - 1].ChildNotes)
                             {
-                                childNote.ActivateFlag(NoteFlags.StarPowerEnd);
+                                childNote.Flags |= NoteFlags.StarPowerEnd;
                             }
                         }
                     }
@@ -386,59 +369,6 @@ namespace YARG.Core.Chart
                 }
             }
         }
-
-        public static void SetDrumActivationFlags(this InstrumentDifficulty<DrumNote> difficulty, StarPowerActivationType activationType)
-        {
-            var notes = difficulty.Notes;
-
-            // Use checkpointing to only iterate through the notes once
-            int checkpoint = 0;
-
-            foreach (var phrase in difficulty.Phrases)
-            {
-
-                if (phrase.Type != PhraseType.DrumFill)
-                {
-                    continue;
-                }
-
-                for (int i = checkpoint; i < notes.Count; i++)
-                {
-                    checkpoint = i;
-
-                    // If the current note is outside of the target phrase or if we have exhausted all notes
-                    if (notes[i].Time >= phrase.TimeEnd || i == notes.Count - 1)
-                    {
-                        // Get the rightmost pad
-                        var rightmostNote = notes[i].ParentOrSelf;
-                        foreach (var note in notes[i].AllNotes)
-                        {
-                            if (note.Pad > rightmostNote.Pad)
-                            {
-                                rightmostNote = note;
-                            }
-
-                            // Set every note on this tick as an activation note in the case of AllNotes
-                            if (activationType == StarPowerActivationType.AllNotes)
-                            {
-                                note.ActivateFlag(DrumNoteFlags.StarPowerActivator);
-                            }
-                        }
-
-                        // Only set the rightmost activation note in the case of RightmostNote
-                        if (activationType == StarPowerActivationType.RightmostNote)
-                        {
-                            rightmostNote.ActivateFlag(DrumNoteFlags.StarPowerActivator);
-                        }
-
-                        break;
-                    }
-                }
-            }
-
-            // return difficulty;
-        }
-
 
         public static void RemoveDynamics(this InstrumentDifficulty<DrumNote> difficulty)
         {

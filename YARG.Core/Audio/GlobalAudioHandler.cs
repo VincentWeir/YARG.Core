@@ -1,8 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Threading.Tasks;
-using YARG.Core.Logging;
 
 namespace YARG.Core.Audio
 {
@@ -33,24 +31,22 @@ namespace YARG.Core.Audio
 
             StemSettings = new()
             {
-                { SongStem.Song,     new StemSettings() },
-                { SongStem.Guitar,   new StemSettings() },
-                { SongStem.Bass,     new StemSettings() },
-                { SongStem.Rhythm,   new StemSettings() },
-                { SongStem.Keys,     new StemSettings() },
-                { SongStem.Vocals,   vocals },
-                { SongStem.Vocals1,  vocals },
-                { SongStem.Vocals2,  vocals },
-                { SongStem.Drums,    drums },
-                { SongStem.Drums1,   drums },
-                { SongStem.Drums2,   drums },
-                { SongStem.Drums3,   drums },
-                { SongStem.Drums4,   drums },
-                { SongStem.Crowd,    new StemSettings() },
-                { SongStem.Sfx,      new StemSettings() },
-                { SongStem.DrumSfx,  new StemSettings() },
-                { SongStem.VoxSample, new StemSettings() },
-                { SongStem.Preview, new StemSettings() },
+                { SongStem.Song,    new StemSettings() },
+                { SongStem.Guitar,  new StemSettings() },
+                { SongStem.Bass,    new StemSettings() },
+                { SongStem.Rhythm,  new StemSettings() },
+                { SongStem.Keys,    new StemSettings() },
+                { SongStem.Vocals,  vocals },
+                { SongStem.Vocals1, vocals },
+                { SongStem.Vocals2, vocals },
+                { SongStem.Drums,   drums },
+                { SongStem.Drums1,  drums },
+                { SongStem.Drums2,  drums },
+                { SongStem.Drums3,  drums },
+                { SongStem.Drums4,  drums },
+                { SongStem.Crowd,   new StemSettings() },
+                { SongStem.Sfx,     new StemSettings() },
+                { SongStem.DrumSfx, new StemSettings() },
             };
         }
 
@@ -239,7 +235,7 @@ namespace YARG.Core.Audio
             }
         }
 
-        public static void PlaySoundEffect(SfxSample sample, double duration = 0)
+        public static void PlaySoundEffect(SfxSample sample)
         {
             lock (_instanceLock)
             {
@@ -247,65 +243,7 @@ namespace YARG.Core.Audio
                 {
                     throw new NotInitializedException();
                 }
-                _instance.SfxSamples[(int) sample]?.Play(duration);
-            }
-        }
-
-        public static void StopSoundEffect(SfxSample sample, double duration = 0)
-        {
-            lock (_instanceLock)
-            {
-                if (_instance == null)
-                {
-                    throw new NotInitializedException();
-                }
-                _instance.SfxSamples[(int) sample]?.Stop(duration);
-            }
-        }
-
-        public static void PauseSoundEffect(SfxSample sample)
-        {
-            lock (_instanceLock)
-            {
-                if (_instance == null)
-                {
-                    throw new NotInitializedException();
-                }
-                _instance.SfxSamples[(int) sample]?.Pause();
-            }
-        }
-
-        public static void ResumeSoundEffect(SfxSample sample)
-        {
-            lock (_instanceLock)
-            {
-                if (_instance == null)
-                {
-                    throw new NotInitializedException();
-                }
-                _instance.SfxSamples[(int) sample]?.Resume();
-            }
-        }
-
-        public static void PauseAllSfx()
-        {
-            foreach (var sample in AudioHelpers.SfxSamples)
-            {
-                if (sample.IsPlaying)
-                {
-                    PauseSoundEffect(sample.Kind);
-                }
-            }
-        }
-
-        public static void ResumeAllSfx()
-        {
-            foreach (var sample in AudioHelpers.SfxSamples)
-            {
-                if (sample.IsPlaying)
-                {
-                    ResumeSoundEffect(sample.Kind);
-                }
+                _instance.SfxSamples[(int) sample]?.Play();
             }
         }
 
@@ -318,19 +256,6 @@ namespace YARG.Core.Audio
                     throw new NotInitializedException();
                 }
                 _instance.DrumSfxSamples[(int) sample]?.Play(volume);
-            }
-        }
-
-        public static void PlayVoxSample(VoxSample sample)
-        {
-            lock (_instanceLock)
-            {
-                if (_instance == null)
-                {
-                    throw new NotInitializedException();
-                }
-
-                _instance.VoxSamples[(int) sample]?.Play();
             }
         }
 
@@ -367,6 +292,18 @@ namespace YARG.Core.Audio
                     throw new NotInitializedException();
                 }
                 return _instance.CreateMixer(name, speed, mixerVolume, clampStemVolume);
+            }
+        }
+
+        public static StemMixer? CreateMixer(string name, Stream stream, float speed, double mixerVolume, bool clampStemVolume)
+        {
+            lock (_instanceLock)
+            {
+                if (_instance == null)
+                {
+                    throw new NotInitializedException();
+                }
+                return _instance.CreateMixer(name, stream, speed, mixerVolume, clampStemVolume);
             }
         }
 

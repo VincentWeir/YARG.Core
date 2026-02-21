@@ -2,7 +2,7 @@
 using YARG.Core.Engine;
 using YARG.Core.Engine.Drums;
 using YARG.Core.Engine.Guitar;
-using YARG.Core.Engine.Keys;
+using YARG.Core.Engine.ProKeys;
 using YARG.Core.Engine.Vocals;
 using YARG.Core.Game.Settings;
 
@@ -83,9 +83,6 @@ namespace YARG.Core.Game
             [SettingType(SettingType.Toggle)]
             public bool SoloTaps = false;
 
-            [SettingType(SettingType.Toggle)]
-            public bool NoStarPowerOverlap = false;
-
             [SettingType(SettingType.MillisecondInput)]
             [SettingRange(min: 0f)]
             public double HopoLeniency = 0.08;
@@ -122,7 +119,6 @@ namespace YARG.Core.Game
                     StrumLeniencySmall = StrumLeniencySmall,
                     HitWindow = HitWindow.Copy(),
                     SoloTaps = SoloTaps,
-                    NoStarPowerOverlap = NoStarPowerOverlap,
                 };
             }
 
@@ -145,8 +141,7 @@ namespace YARG.Core.Game
                     StrumLeniencySmall,
                     InfiniteFrontEnd,
                     AntiGhosting,
-                    SoloTaps,
-                    NoStarPowerOverlap);
+                    SoloTaps);
             }
         }
 
@@ -156,9 +151,6 @@ namespace YARG.Core.Game
         /// </summary>
         public class DrumsPreset
         {
-            [SettingType(SettingType.Toggle)]
-            public bool NoStarPowerOverlap = false;
-
             [SettingType(SettingType.Special)]
             public HitWindowPreset HitWindow = new()
             {
@@ -172,7 +164,6 @@ namespace YARG.Core.Game
             {
                 return new DrumsPreset
                 {
-                    NoStarPowerOverlap = NoStarPowerOverlap,
                     HitWindow = HitWindow.Copy()
                 };
             }
@@ -184,8 +175,7 @@ namespace YARG.Core.Game
                     hitWindow,
                     DEFAULT_MAX_MULTIPLIER,
                     starMultiplierThresholds,
-                    mode,
-                    NoStarPowerOverlap);
+                    mode);
             }
         }
 
@@ -296,9 +286,6 @@ namespace YARG.Core.Game
         /// </summary>
         public class ProKeysPreset
         {
-            [SettingType(SettingType.Toggle)]
-            public bool NoStarPowerOverlap = false;
-
             [SettingType(SettingType.MillisecondInput)]
             [SettingRange(min: 0f)]
             public double ChordStaggerWindow = 0.05;
@@ -324,25 +311,23 @@ namespace YARG.Core.Game
             {
                 return new ProKeysPreset
                 {
-                    NoStarPowerOverlap = NoStarPowerOverlap,
                     ChordStaggerWindow = ChordStaggerWindow,
                     FatFingerWindow = FatFingerWindow,
                     HitWindow = HitWindow.Copy(),
                 };
             }
 
-            public KeysEngineParameters Create(float[] starMultiplierThresholds, bool isBass)
+            public ProKeysEngineParameters Create(float[] starMultiplierThresholds)
             {
                 var hitWindow = HitWindow.Create();
-                return new KeysEngineParameters(
+                return new ProKeysEngineParameters(
                     hitWindow,
-                    isBass ? BASS_MAX_MULTIPLIER : DEFAULT_MAX_MULTIPLIER,
+                    DEFAULT_MAX_MULTIPLIER,
                     DEFAULT_WHAMMY_BUFFER,
                     SustainDropLeniency,
                     starMultiplierThresholds,
                     ChordStaggerWindow,
-                    FatFingerWindow,
-                    NoStarPowerOverlap);
+                    FatFingerWindow);
             }
         }
     }

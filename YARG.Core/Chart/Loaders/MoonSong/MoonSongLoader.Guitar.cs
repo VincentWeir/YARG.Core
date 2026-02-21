@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using MoonscraperChartEditor.Song;
-using MoonscraperChartEditor.Song.IO;
-using YARG.Core.Chart.Events;
 
 namespace YARG.Core.Chart
 {
@@ -10,7 +9,7 @@ namespace YARG.Core.Chart
     {
         public InstrumentTrack<GuitarNote> LoadGuitarTrack(Instrument instrument)
         {
-            return instrument.ToNativeGameMode() switch
+            return instrument.ToGameMode() switch
             {
                 GameMode.FiveFretGuitar => LoadGuitarTrack(instrument, CreateFiveFretGuitarNote),
                 GameMode.SixFretGuitar  => LoadGuitarTrack(instrument, CreateSixFretGuitarNote),
@@ -27,10 +26,7 @@ namespace YARG.Core.Chart
                 { Difficulty.Hard, LoadDifficulty(instrument, Difficulty.Hard, createNote) },
                 { Difficulty.Expert, LoadDifficulty(instrument, Difficulty.Expert, createNote) },
             };
-
-            var track = new InstrumentTrack<GuitarNote>(instrument, difficulties, GetAnimationTrack(instrument));
-
-            return track;
+            return new(instrument, difficulties);
         }
 
         private GuitarNote CreateFiveFretGuitarNote(MoonNote moonNote, Dictionary<MoonPhrase.Type, MoonPhrase> currentPhrases)

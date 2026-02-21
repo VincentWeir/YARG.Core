@@ -156,7 +156,6 @@ namespace YARG.Core.Song
         public string CharterProKeys    => _metadata.CharterProKeys;
         public string CharterProGuitar  => _metadata.CharterProGuitar;
         public string CharterVocals     => _metadata.CharterVocals;
-        public string CharterVenue      => _metadata.CharterVenue;
 
         public long SongLengthMilliseconds => _metadata.SongLength;
 
@@ -181,8 +180,6 @@ namespace YARG.Core.Song
         public double VideoStartTimeSeconds => VideoStartTimeMilliseconds / SongMetadata.MILLISECOND_FACTOR;
 
         public double VideoEndTimeSeconds => VideoEndTimeMilliseconds >= 0 ? VideoEndTimeMilliseconds / SongMetadata.MILLISECOND_FACTOR : -1;
-
-        public float? VocalScrollSpeedScalingFactor => _metadata.VocalScrollSpeedScalingFactor;
 
         public int VocalsCount
         {
@@ -286,66 +283,6 @@ namespace YARG.Core.Song
             };
         }
 
-        /// <summary>
-        /// Checks that song has the given difficulties for a given instrument
-        /// </summary>
-        /// <param name="instrument">Instrument</param>
-        /// <param name="difficulty">DifficultyMask</param>
-        /// <returns>bool</returns>
-        public bool HasDifficultyForInstrument(Instrument instrument, DifficultyMask difficulty)
-        {
-            PartValues? part = instrument switch
-            {
-                Instrument.FiveFretGuitar     => _parts.FiveFretGuitar,
-                Instrument.FiveFretBass       => _parts.FiveFretBass,
-                Instrument.FiveFretRhythm     => _parts.FiveFretRhythm,
-                Instrument.FiveFretCoopGuitar => _parts.FiveFretCoopGuitar,
-                Instrument.Keys               => _parts.Keys,
-
-                Instrument.SixFretGuitar     => _parts.SixFretGuitar,
-                Instrument.SixFretBass       => _parts.SixFretBass,
-                Instrument.SixFretRhythm     => _parts.SixFretRhythm,
-                Instrument.SixFretCoopGuitar => _parts.SixFretCoopGuitar,
-
-                Instrument.FourLaneDrums => _parts.FourLaneDrums,
-                Instrument.FiveLaneDrums => _parts.FiveLaneDrums,
-                Instrument.ProDrums      => _parts.ProDrums,
-
-                Instrument.EliteDrums => _parts.EliteDrums,
-
-                Instrument.ProGuitar_17Fret => _parts.ProGuitar_17Fret,
-                Instrument.ProGuitar_22Fret => _parts.ProGuitar_22Fret,
-                Instrument.ProBass_17Fret   => _parts.ProBass_17Fret,
-                Instrument.ProBass_22Fret   => _parts.ProBass_22Fret,
-
-                Instrument.ProKeys => _parts.ProKeys,
-
-                Instrument.Vocals  => _parts.LeadVocals,
-                Instrument.Harmony => _parts.HarmonyVocals,
-                Instrument.Band    => _parts.BandDifficulty,
-                _ => throw new ArgumentException("Unhandled instrument", nameof(instrument))
-            };
-
-            return (difficulty & part.Value.Difficulties) == difficulty;
-        }
-
-        public bool HasDifficultyForInstrument(Instrument instrument, Difficulty difficulty)
-        {
-            return HasDifficultyForInstrument(instrument, difficulty.ToDifficultyMask());
-        }
-
-        /// <summary>
-        /// Checks that song has the full set of EMHX difficulties for a given instrument
-        /// </summary>
-        /// <param name="instrument">Instrument</param>
-        /// <returns>bool</returns>
-        public bool HasEmhxDifficultiesForInstrument(Instrument instrument)
-        {
-            var mask = Difficulty.Easy.ToDifficultyMask() | Difficulty.Medium.ToDifficultyMask() |
-                Difficulty.Hard.ToDifficultyMask() | Difficulty.Expert.ToDifficultyMask();
-            return HasDifficultyForInstrument(instrument, mask);
-        }
-
         internal void MarkAsDuplicate() { _isDuplicate = true; }
 
         internal virtual void Serialize(MemoryStream stream, CacheWriteIndices node)
@@ -388,10 +325,7 @@ namespace YARG.Core.Song
             stream.Write(_metadata.LinkBluesky);
             stream.Write(_metadata.LinkFacebook);
             stream.Write(_metadata.LinkInstagram);
-            stream.Write(_metadata.LinkNewgrounds);
-            stream.Write(_metadata.LinkSoundcloud);
             stream.Write(_metadata.LinkSpotify);
-            stream.Write(_metadata.LinkTiktok);
             stream.Write(_metadata.LinkTwitter);
             stream.Write(_metadata.LinkOther);
             stream.Write(_metadata.LinkYoutube);
@@ -421,7 +355,6 @@ namespace YARG.Core.Song
             stream.Write(_metadata.CharterProBass);
             stream.Write(_metadata.CharterProKeys);
             stream.Write(_metadata.CharterProGuitar);
-            stream.Write(_metadata.CharterVenue);
             stream.Write(_metadata.CharterVocals);
 
             stream.Write(_settings.HopoThreshold, Endianness.Little);
@@ -472,10 +405,7 @@ namespace YARG.Core.Song
             _metadata.LinkBluesky = stream.ReadString();
             _metadata.LinkFacebook = stream.ReadString();
             _metadata.LinkInstagram = stream.ReadString();
-            _metadata.LinkNewgrounds = stream.ReadString();
-            _metadata.LinkSoundcloud = stream.ReadString();
             _metadata.LinkSpotify = stream.ReadString();
-            _metadata.LinkTiktok = stream.ReadString();
             _metadata.LinkTwitter = stream.ReadString();
             _metadata.LinkOther = stream.ReadString();
             _metadata.LinkYoutube = stream.ReadString();
@@ -505,7 +435,6 @@ namespace YARG.Core.Song
             _metadata.CharterProBass = stream.ReadString();
             _metadata.CharterProKeys = stream.ReadString();
             _metadata.CharterProGuitar = stream.ReadString();
-            _metadata.CharterVenue = stream.ReadString();
             _metadata.CharterVocals = stream.ReadString();
 
             _settings.HopoThreshold = stream.Read<long>(Endianness.Little);

@@ -158,7 +158,7 @@ namespace YARG.Core.Chart
             where TEvent : ChartEvent
         {
             if (events.Count < 1)
-                return double.MaxValue;
+                return 0;
 
             // Chart events are sorted
             var chartEvent = events[0];

@@ -3,9 +3,9 @@ using YARG.Core.Extensions;
 using YARG.Core.IO;
 using YARG.Core.Replays;
 
-namespace YARG.Core.Engine.Keys
+namespace YARG.Core.Engine.ProKeys
 {
-    public class KeysStats : BaseStats
+    public class ProKeysStats : BaseStats
     {
         /// <summary>
         /// Number of overhits which have occurred.
@@ -17,19 +17,17 @@ namespace YARG.Core.Engine.Keys
         /// </summary>
         public int FatFingersIgnored;
 
-        public override bool IsFullCombo => MaxCombo == TotalChords;
-
-        public KeysStats()
+        public ProKeysStats()
         {
         }
 
-        public KeysStats(KeysStats stats) : base(stats)
+        public ProKeysStats(ProKeysStats stats) : base(stats)
         {
             Overhits = stats.Overhits;
             FatFingersIgnored = stats.FatFingersIgnored;
         }
 
-        public KeysStats(ref FixedArrayStream stream, int version)
+        public ProKeysStats(ref FixedArrayStream stream, int version)
             : base(ref stream, version)
         {
             Overhits = stream.Read<int>(Endianness.Little);

@@ -29,7 +29,7 @@ public partial class Cli
 
         // Print result data
 
-        var bandScore = results.Sum(x => x.ResultStats.TotalScore + x.ResultStats.BandBonusScore);
+        var bandScore = results.Sum(x => x.ResultStats.TotalScore);
         if (results.Any(x => !x.Passed))
         {
             Console.ForegroundColor = ConsoleColor.Red;

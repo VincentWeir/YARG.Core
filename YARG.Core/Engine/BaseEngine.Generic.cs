@@ -84,8 +84,6 @@ namespace YARG.Core.Engine
                 EngineStats.TotalNotes = Notes.Count;
             }
 
-            EngineStats.TotalChords = EngineStats.TotalNotes;
-
             EngineStats.TotalStarPowerPhrases = Chart.Phrases.Count((phrase) => phrase.Type == PhraseType.StarPower);
 
             TicksPerSustainPoint = SyncTrack.Resolution / (double) POINTS_PER_BEAT;
@@ -273,13 +271,13 @@ namespace YARG.Core.Engine
                 if (IsWaitCountdownActive)
                 {
                     var currentCountdown = WaitCountdowns[CurrentWaitCountdownIndex];
-                    double endTime = currentCountdown.TimeEnd;
+                    double deactivateTime = currentCountdown.DeactivateTime;
 
-                    if (IsTimeBetween(endTime, previousTime, nextTime))
+                    if (IsTimeBetween(deactivateTime, previousTime, nextTime))
                     {
                         YargLogger.LogFormatTrace("Queuing countdown {0} deactivation at {1}",
-                            CurrentWaitCountdownIndex, endTime);
-                        QueueUpdateTime(endTime, "Deactivate Countdown");
+                            CurrentWaitCountdownIndex, deactivateTime);
+                        QueueUpdateTime(deactivateTime, "Deactivate Countdown");
                     }
                 }
                 else
@@ -390,7 +388,7 @@ namespace YARG.Core.Engine
 
                 if (time >= currentCountdown.Time)
                 {
-                    if (time < currentCountdown.TimeEnd)
+                    if (time < currentCountdown.DeactivateTime)
                     {
                         // This countdown should be displayed onscreen
                         if (!IsWaitCountdownActive)
@@ -407,7 +405,7 @@ namespace YARG.Core.Engine
                         if (IsWaitCountdownActive)
                         {
                             IsWaitCountdownActive = false;
-                            YargLogger.LogFormatTrace("Countdown {0} deactivated at time {1}. Expected time: {2}", CurrentWaitCountdownIndex, time, currentCountdown.TimeEnd);
+                            YargLogger.LogFormatTrace("Countdown {0} deactivated at time {1}. Expected time: {2}", CurrentWaitCountdownIndex, time, currentCountdown.DeactivateTime);
                         }
 
                         CurrentWaitCountdownIndex++;
@@ -542,7 +540,6 @@ namespace YARG.Core.Engine
                 var spScore = scoreMultiplier / 2;
 
                 EngineStats.StarPowerScore += spScore;
-                EngineStats.BandBonusScore += EngineStats.BandBonusMultiplier * spScore;
 
                 // Subtract score from the note that was just hit to get the multiplier points
                 EngineStats.MultiplierScore += spScore - score;
@@ -550,9 +547,7 @@ namespace YARG.Core.Engine
             else
             {
                 EngineStats.MultiplierScore += scoreMultiplier - score;
-                EngineStats.BandBonusScore += EngineStats.BandBonusMultiplier * scoreMultiplier;
             }
-
             UpdateStars();
         }
 

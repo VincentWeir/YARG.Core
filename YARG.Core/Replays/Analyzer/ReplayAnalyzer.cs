@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using YARG.Core.Chart;
@@ -7,8 +7,8 @@ using YARG.Core.Engine.Drums;
 using YARG.Core.Engine.Drums.Engines;
 using YARG.Core.Engine.Guitar;
 using YARG.Core.Engine.Guitar.Engines;
-using YARG.Core.Engine.Keys.Engines;
-using YARG.Core.Engine.Keys;
+using YARG.Core.Engine.ProKeys.Engines;
+using YARG.Core.Engine.ProKeys;
 using YARG.Core.Engine.Vocals;
 using YARG.Core.Engine.Vocals.Engines;
 using YARG.Core.Game;
@@ -31,8 +31,6 @@ namespace YARG.Core.Replays.Analyzer
 
         private readonly Random _random = new();
 
-        private readonly double _replayLength;
-
         public ReplayAnalyzer(SongChart chart, ReplayInfo replayInfo, ReplayData replayData, double fps, int frameNum)
         {
             _chart = chart;
@@ -50,8 +48,6 @@ namespace YARG.Core.Replays.Analyzer
             {
                 _frameNum = -1;
             }
-
-            _replayLength = replayInfo.ReplayLength;
         }
 
         public static AnalysisResult[] AnalyzeReplay(SongChart chart, ReplayInfo info, ReplayData data, double fps = 0, int frameNum = -1)
@@ -129,7 +125,7 @@ namespace YARG.Core.Replays.Analyzer
                     AppendStatDifference("TotalTicks", originalVocals.TotalTicks, resultVocals.TotalTicks);
                     break;
                 }
-                case (KeysStats originalKeys, KeysStats resultKeys):
+                case (ProKeysStats originalKeys, ProKeysStats resultKeys):
                 {
                     sb.AppendLine("Pro Keys stats:");
                     AppendStatDifference("Overhits", originalKeys.Overhits, resultKeys.Overhits);
@@ -171,13 +167,11 @@ namespace YARG.Core.Replays.Analyzer
             {
                 var engine = CreateEngine(frame.Profile, frame.EngineParameters);
                 engines.Add(engine);
-
-                // TODO: Implement support for custom RockMeterPresets in replays
-                manager.Register(engine, frame.Profile.CurrentInstrument, _chart, RockMeterPreset.Normal);
+                manager.Register(engine, frame.Profile.CurrentInstrument, _chart);
                 engine.SetSpeed(frame.EngineParameters.SongSpeed);
                 engine.Reset();
 
-                maxTime = _replayLength;
+                maxTime = _chart.GetEndTime();
                 if (frame.Inputs.Length > 0)
                 {
                     double last = frame.Inputs[^1].Time;
@@ -186,6 +180,7 @@ namespace YARG.Core.Replays.Analyzer
                         maxTime = last;
                     }
                 }
+                maxTime += 2;
             }
 
             // Seems like a sensible default?
@@ -243,7 +238,7 @@ namespace YARG.Core.Replays.Analyzer
                     }
 
                     // Create engine
-                    return new YargFiveFretGuitarEngine(
+                    return new YargFiveFretEngine(
                         notes,
                         _chart.SyncTrack,
                         (GuitarEngineParameters) parameters,
@@ -251,12 +246,10 @@ namespace YARG.Core.Replays.Analyzer
                 }
                 case GameMode.FourLaneDrums:
                 case GameMode.FiveLaneDrums:
-                case GameMode.EliteDrums:
                 {
                     // Reset the notes
                     var notes = _chart.GetDrumsTrack(profile.CurrentInstrument)
                         .GetDifficulty(profile.CurrentDifficulty).Clone();
-                    notes.SetDrumActivationFlags(profile.StarPowerActivationType);
                     profile.ApplyModifiers(notes);
                     foreach (var note in notes.Notes)
                     {
@@ -271,38 +264,14 @@ namespace YARG.Core.Replays.Analyzer
                         notes,
                         _chart.SyncTrack,
                         (DrumsEngineParameters) parameters,
-                        profile.IsBot,
-                        profile.GameMode is GameMode.EliteDrums);
+                        profile.IsBot);
                 }
                 case GameMode.ProKeys:
                 {
-                    if (profile.CurrentInstrument is Instrument.ProKeys) // Pro Keys
-                    {
-                        // Reset the notes
-                        var proNotes = _chart.ProKeys.GetDifficulty(profile.CurrentDifficulty).Clone();
-                        profile.ApplyModifiers(proNotes);
-                        foreach (var note in proNotes.Notes)
-                        {
-                            foreach (var subNote in note.AllNotes)
-                            {
-                                subNote.ResetNoteState();
-                            }
-                        }
-
-                        // Create engine
-                        return new YargProKeysEngine(
-                            proNotes,
-                            _chart.SyncTrack,
-                            (KeysEngineParameters) parameters,
-                            profile.IsBot);
-                    }
-
-                    // Five-Lane Keys
                     // Reset the notes
-                    var fiveLaneNotes = _chart.GetFiveFretTrack(profile.CurrentInstrument)
-                        .GetDifficulty(profile.CurrentDifficulty).Clone();
-                    profile.ApplyModifiers(fiveLaneNotes);
-                    foreach (var note in fiveLaneNotes.Notes)
+                    var notes = _chart.ProKeys.GetDifficulty(profile.CurrentDifficulty).Clone();
+                    profile.ApplyModifiers(notes);
+                    foreach (var note in notes.Notes)
                     {
                         foreach (var subNote in note.AllNotes)
                         {
@@ -311,10 +280,10 @@ namespace YARG.Core.Replays.Analyzer
                     }
 
                     // Create engine
-                    return new YargFiveLaneKeysEngine(
-                        fiveLaneNotes,
+                    return new YargProKeysEngine(
+                        notes,
                         _chart.SyncTrack,
-                        (KeysEngineParameters) parameters,
+                        (ProKeysEngineParameters) parameters,
                         profile.IsBot);
                 }
                 case GameMode.Vocals:
@@ -481,7 +450,7 @@ namespace YARG.Core.Replays.Analyzer
                 //     instrumentPass = IsInstrumentPassResult(pg1, pg2, ref builder);
                 //     break;
 
-                case (KeysStats pk1, KeysStats pk2):
+                case (ProKeysStats pk1, ProKeysStats pk2):
                     instrumentPass = IsInstrumentPassResult(pk1, pk2, ref builder);
                     break;
 
@@ -590,7 +559,7 @@ namespace YARG.Core.Replays.Analyzer
         //     return original.Stat == result.Stat;
         // }
 
-        private static bool IsInstrumentPassResult(KeysStats original, KeysStats result, ref Utf16ValueStringBuilder builder)
+        private static bool IsInstrumentPassResult(ProKeysStats original, ProKeysStats result, ref Utf16ValueStringBuilder builder)
         {
             void FormatStat<T>(string stat, T originalValue, T resultValue, ref Utf16ValueStringBuilder builder)
                 where T : IEquatable<T>
